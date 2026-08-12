@@ -8,7 +8,7 @@
         <version>4.1.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>be.bstorm</groupId>
+    <groupId>be.technifutur</groupId>
     <artifactId>GameNote</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -86,33 +86,28 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>be.bstorm</groupId>
+                <groupId>be.technifutur</groupId>
                 <artifactId>api</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
             </dependency>
             <dependency>
-                <groupId>be.bstorm</groupId>
+                <groupId>be.technifutur</groupId>
                 <artifactId>bll</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
             </dependency>
             <dependency>
-                <groupId>be.bstorm</groupId>
+                <groupId>be.technifutur</groupId>
                 <artifactId>dal</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
             </dependency>
             <dependency>
-                <groupId>be.bstorm</groupId>
+                <groupId>be.technifutur</groupId>
                 <artifactId>dl</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
             </dependency>
             <dependency>
-                <groupId>be.bstorm</groupId>
+                <groupId>be.technifutur</groupId>
                 <artifactId>il</artifactId>
-                <version>0.0.1-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>be.bstorm</groupId>
-                <artifactId>spec</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
             </dependency>
         </dependencies>
