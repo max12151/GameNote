@@ -1,23 +1,27 @@
 package be.technifutur.gamenote.api.igdb;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/igdb")
 public class IgdbController {
-    private final IgdbGameClient client;
 
-    public IgdbController(IgdbGameClient client) { this.client = client; }
+    private final IgdbGameClient igdbGameClient;
 
-    @GetMapping("/games/search")
-    public List<IgdbGameResult> search(@RequestParam String title,
-                                       @RequestParam(defaultValue = "10") int limit) {
-        try { return client.search(title, limit); }
-        catch (IllegalStateException exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "IGDB is not configured", exception); }
-        catch (RuntimeException exception) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "IGDB request failed", exception); }
+    public IgdbController(IgdbGameClient igdbGameClient) {
+        this.igdbGameClient = igdbGameClient;
+    }
+
+    @GetMapping("/games")
+    public List<IgdbGameResult> searchGames(
+            @RequestParam String search,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return igdbGameClient.searchGames(search, limit);
     }
 }

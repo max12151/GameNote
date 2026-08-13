@@ -1,18 +1,22 @@
 package be.technifutur.gamenote.api.igdb;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record IgdbGameResult(
-        long igdbId,
-        String title,
+        Long id,
+        String name,
         String summary,
+
+        @JsonProperty("first_release_date")
         Long firstReleaseDate,
-        String coverUrl,
-        List<String> artworkUrls,
-        List<String> screenshotUrls,
-        List<String> genres,
-        List<String> platforms,
-        List<String> developers,
-        List<String> publishers,
-        Double rating,
-        Double aggregatedRating) {}
+
+        Cover cover
+) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Cover(
+            String url
+    ) {
+    }
+}

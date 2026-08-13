@@ -1,57 +1,98 @@
 package be.technifutur.gamenote.api.igdb;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 
 @Service
 public class IgdbTokenService {
-    private final RestClient twitch;
-    private final IgdbProperties properties;
-    private volatile CachedToken cached;
 
-    public IgdbTokenService(RestClient twitchRestClient, IgdbProperties properties) {
-        this.twitch = twitchRestClient;
+    private final RestTemplate restTemplate;
+    private final IgdbProperties properties;
+
+    private String accessToken;
+    private Instant tokenExpiration;
+
+    public IgdbTokenService(
+            RestTemplate restTemplate,
+            IgdbProperties properties
+    ) {
+        this.restTemplate = restTemplate;
         this.properties = properties;
     }
 
-    public String token() {
-        if (properties.clientId().isBlank() || properties.clientSecret().isBlank()) {
-            throw new IllegalStateException("IGDB_CLIENT_ID and IGDB_CLIENT_SECRET must be configured");
+    public synchronized String getAccessToken() {
+        if (tokenIsStillValid()) {
+            return accessToken;
         }
-        var current = cached;
-        if (current != null && current.expiresAt().isAfter(Instant.now().plusSeconds(60))) {
-            return current.value();
-        }
-        synchronized (this) {
-            current = cached;
-            if (current == null || !current.expiresAt().isAfter(Instant.now().plusSeconds(60))) {
-                var response = twitch.post()
-                        .uri(uri -> uri.path("/oauth2/token")
-                                .queryParam("client_id", properties.clientId())
-                                .queryParam("client_secret", properties.clientSecret())
-                                .queryParam("grant_type", "client_credentials")
-                                .build())
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .retrieve()
-                        .body(TokenResponse.class);
-                if (response == null || response.accessToken() == null) {
-                    throw new IllegalStateException("Twitch returned no IGDB access token");
-                }
-                cached = new CachedToken(response.accessToken(),
-                        Instant.now().plusSeconds(Math.max(response.expiresIn(), 120)));
-            }
-            return cached.value();
-        }
+
+        IgdbTokenResponse response = requestNewToken();
+
+        this.accessToken = response.accessToken();
+
+        /*
+         * On retire 60 secondes pour éviter d'utiliser
+         * un token juste avant son expiration.
+         */
+        this.tokenExpiration = Instant.now()
+                .plusSeconds(Math.max(0, response.expiresIn() - 60));
+
+        return this.accessToken;
     }
 
-    private record CachedToken(String value, Instant expiresAt) {}
+    private boolean tokenIsStillValid() {
+        return accessToken != null
+                && tokenExpiration != null
+                && Instant.now().isBefore(tokenExpiration);
+    }
 
-    private record TokenResponse(
-            @JsonProperty("access_token") String accessToken,
-            @JsonProperty("expires_in") long expiresIn,
-            @JsonProperty("token_type") String tokenType) {}
+    private IgdbTokenResponse requestNewToken() {
+        MultiValueMap<String, String> formData =
+                new LinkedMultiValueMap<>();
+
+        formData.add("client_id", properties.getClientId());
+        formData.add("client_secret", properties.getClientSecret());
+        formData.add("grant_type", "client_credentials");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(
+                MediaType.APPLICATION_FORM_URLENCODED
+        );
+
+        HttpEntity<MultiValueMap<String, String>> request =
+                new HttpEntity<>(formData, headers);
+
+        IgdbTokenResponse response = restTemplate.postForObject(
+                properties.getTokenUrl(),
+                request,
+                IgdbTokenResponse.class
+        );
+
+        if (response == null || response.accessToken() == null) {
+            throw new IllegalStateException(
+                    "Impossible de récupérer le token IGDB"
+            );
+        }
+
+        return response;
+    }
+
+    private record IgdbTokenResponse(
+            @JsonProperty("access_token")
+            String accessToken,
+
+            @JsonProperty("expires_in")
+            long expiresIn,
+
+            @JsonProperty("token_type")
+            String tokenType
+    ) {
+    }
 }

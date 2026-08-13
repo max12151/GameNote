@@ -1,24 +1,44 @@
 package be.technifutur.gamenote.api.igdb;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@Component
+@ConfigurationProperties(prefix = "igdb")
 public class IgdbProperties {
-    private final String baseUrl;
-    private final String clientId;
-    private final String clientSecret;
 
-    public IgdbProperties(
-            @Value("${IGDB_BASE_URL:https://api.igdb.com/v4}") String baseUrl,
-            @Value("${IGDB_CLIENT_ID:}") String clientId,
-            @Value("${IGDB_CLIENT_SECRET:}") String clientSecret) {
-        this.baseUrl = baseUrl;
+    private String clientId;
+    private String clientSecret;
+    private String tokenUrl;
+    private String apiUrl;
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
         this.clientId = clientId;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
+    }
+
+    public void setClientSecret(String clientSecret) {
         this.clientSecret = clientSecret;
     }
 
-    public String baseUrl() { return baseUrl; }
-    public String clientId() { return clientId; }
-    public String clientSecret() { return clientSecret; }
+    public String getTokenUrl() {
+        return tokenUrl;
+    }
+
+    public void setTokenUrl(String tokenUrl) {
+        this.tokenUrl = tokenUrl;
+    }
+
+    public String getApiUrl() {
+        return apiUrl;
+    }
+
+    public void setApiUrl(String apiUrl) {
+        this.apiUrl = apiUrl;
+    }
 }
