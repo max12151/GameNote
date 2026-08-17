@@ -26,11 +26,7 @@
             <groupId>be.technifutur</groupId>
             <artifactId>dl</artifactId>
         </dependency>
-        <dependency>
-            <groupId>be.technifutur</groupId>
-            <artifactId>il</artifactId>
-        </dependency>
-
+        <!-- il ne doit pas dépendre de bll pour respecter le layering -->
     </dependencies>
 
 </project>
