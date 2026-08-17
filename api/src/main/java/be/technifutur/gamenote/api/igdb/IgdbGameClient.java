@@ -9,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-
 import java.util.List;
 
 @Component
@@ -43,7 +42,10 @@ public class IgdbGameClient {
 
         String igdbQuery = """
             search "%s";
-            fields id,name,summary,first_release_date,cover.url;
+            fields id,name,summary,first_release_date,cover.url,
+                   genres.name,platforms.name,rating,aggregated_rating,
+                   involved_companies.company.name,involved_companies.developer,involved_companies.publisher,
+                   artworks.url,screenshots.url;
             limit %d;
             """
                 .formatted(

@@ -18,10 +18,12 @@ public class IgdbController {
     }
 
     @GetMapping("/games")
-    public List<IgdbGameResult> searchGames(
+    public List<IgdbGameDto> searchGames(
             @RequestParam String search,
             @RequestParam(defaultValue = "20") int limit
     ) {
-        return igdbGameClient.searchGames(search, limit);
+        return igdbGameClient.searchGames(search, limit).stream()
+                .map(IgdbGameDto::from)
+                .toList();
     }
 }

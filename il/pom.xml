@@ -23,6 +23,16 @@
             <artifactId>dl</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
+        <dependency>
+            <groupId>be.technifutur</groupId>
+            <artifactId>dal</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>be.technifutur</groupId>
+            <artifactId>bll</artifactId>
+        </dependency>
     </dependencies>
+
 
 </project>
