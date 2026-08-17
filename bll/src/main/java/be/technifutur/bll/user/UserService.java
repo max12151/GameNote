@@ -1,5 +1,8 @@
 package be.technifutur.bll.user;
 
+import be.technifutur.bll.exception.DuplicateResourceException;
+import be.technifutur.bll.exception.InvalidCredentialsException;
+import be.technifutur.bll.exception.ResourceNotFoundException;
 import be.technifutur.dal.user.UserEntity;
 import be.technifutur.dal.user.UserRepository;
 import java.time.OffsetDateTime;
@@ -28,10 +31,10 @@ public class UserService {
                                String bio) {
 
         if (userRepository.existsByUsername(username)) {
-            throw new IllegalArgumentException("Username already taken");
+            throw new DuplicateResourceException("Ce nom d'utilisateur est déjà utilisé");
         }
         if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("Email already in use");
+            throw new DuplicateResourceException("Cet email est déjà utilisé");
         }
 
         UserEntity user = new UserEntity();
@@ -45,11 +48,30 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
+    public UserEntity authenticate(String username, String rawPassword) {
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new InvalidCredentialsException("Identifiants invalides"));
+
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException("Identifiants invalides");
+        }
+
+        return user;
+    }
+
     public Optional<UserEntity> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
 
-    public boolean verifyPassword(UserEntity user, String rawPassword) {
-        return passwordEncoder.matches(rawPassword, user.getPasswordHash());
+    @Transactional
+    public UserEntity updateProfile(String username, String bio, String avatarUrl) {
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        user.setBio(bio);
+        user.setAvatarUrl(avatarUrl);
+
+        return userRepository.save(user);
     }
 }

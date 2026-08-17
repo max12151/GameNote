@@ -32,6 +32,11 @@ public class UserEntity {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     // Getters / setters
 
     public Long getId() {

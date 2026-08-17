@@ -1,8 +1,13 @@
 package be.technifutur.dl.auth;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class LoginRequestDto {
 
+    @NotBlank
     private String username;
+
+    @NotBlank
     private String password;
 
     public String getUsername() {

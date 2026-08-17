@@ -1,5 +1,7 @@
 package be.technifutur.dl.user;
 
+import java.time.OffsetDateTime;
+
 public class UserDto {
 
     private Long id;
@@ -7,6 +9,7 @@ public class UserDto {
     private String email;
     private String avatarUrl;
     private String bio;
+    private OffsetDateTime createdAt;
 
     public Long getId() {
         return id;
@@ -46,5 +49,13 @@ public class UserDto {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

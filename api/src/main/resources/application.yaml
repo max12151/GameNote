@@ -20,3 +20,7 @@ igdb:
   client-secret: ${IGDB_CLIENT_SECRET}
   token-url: https://id.twitch.tv/oauth2/token
   api-url: https://api.igdb.com/v4
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-change-me-please-min-32-bytes-long-1234567890}
+  expiration-ms: 86400000

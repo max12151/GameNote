@@ -14,7 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>be.technifutur</groupId>
-            <artifactId>bll</artifactId>
+            <artifactId>il</artifactId>
         </dependency>
         <dependency>
             <groupId>be.technifutur</groupId>
