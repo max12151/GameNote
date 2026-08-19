@@ -11,6 +11,9 @@ public record IgdbGameResult(
         String name,
         String summary,
 
+        @JsonProperty("game_type")
+        Long gameType,
+
         @JsonProperty("first_release_date")
         Long firstReleaseDate,
 
