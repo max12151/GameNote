@@ -35,6 +35,10 @@ public class RatingFacade {
                 request.getCoverUrl(),
                 request.getReleaseDate(),
                 request.getGenres(),
+                request.getSummary(),
+                request.getDevelopers(),
+                request.getPublishers(),
+                request.getPlatforms(),
                 request.getRating()
         ));
     }

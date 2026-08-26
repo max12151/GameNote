@@ -23,6 +23,10 @@ public class GameRatingMapper {
         dto.setCoverUrl(entity.getCoverUrl());
         dto.setReleaseDate(entity.getReleaseDate());
         dto.setGenres(entity.getGenres());
+        dto.setSummary(entity.getSummary());
+        dto.setDevelopers(entity.getDevelopers());
+        dto.setPublishers(entity.getPublishers());
+        dto.setPlatforms(entity.getPlatforms());
         dto.setRating(entity.getRating());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());

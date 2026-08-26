@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
@@ -54,6 +55,22 @@ public class IgdbTokenService {
     }
 
     private IgdbTokenResponse requestNewToken() {
+        try {
+            return fetchToken();
+        } catch (RestClientException firstFailure) {
+            // La toute première connexion HTTPS sortante d'une JVM fraîchement démarrée
+            // peut échouer une fois (latence de handshake/DNS) puis réussir immédiatement
+            // après : on retente donc une seule fois avant d'abandonner pour de bon.
+            try {
+                return fetchToken();
+            } catch (RestClientException secondFailure) {
+                secondFailure.addSuppressed(firstFailure);
+                throw secondFailure;
+            }
+        }
+    }
+
+    private IgdbTokenResponse fetchToken() {
         MultiValueMap<String, String> formData =
                 new LinkedMultiValueMap<>();
 

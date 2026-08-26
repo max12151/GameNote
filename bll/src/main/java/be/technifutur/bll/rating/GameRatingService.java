@@ -28,6 +28,10 @@ public class GameRatingService {
                                      String coverUrl,
                                      Long releaseDate,
                                      List<String> genres,
+                                     String summary,
+                                     List<String> developers,
+                                     List<String> publishers,
+                                     List<String> platforms,
                                      int rating) {
         GameRatingEntity entity = gameRatingRepository.findByUserIdAndIgdbGameId(userId, igdbGameId)
                 .orElseGet(() -> {
@@ -42,6 +46,10 @@ public class GameRatingService {
         entity.setCoverUrl(coverUrl);
         entity.setReleaseDate(releaseDate);
         entity.setGenres(genres);
+        entity.setSummary(summary);
+        entity.setDevelopers(developers);
+        entity.setPublishers(publishers);
+        entity.setPlatforms(platforms);
         entity.setRating(rating);
 
         return gameRatingRepository.save(entity);

@@ -7,7 +7,9 @@ public class UpdateProfileRequestDto {
     @Size(max = 1000)
     private String bio;
 
-    @Size(max = 2048)
+    // Data URI base64 (image recadrée/compressée côté navigateur avant envoi),
+    // pas une simple URL : la limite doit couvrir une image, pas juste un lien.
+    @Size(max = 2_000_000)
     private String avatarUrl;
 
     public String getBio() {

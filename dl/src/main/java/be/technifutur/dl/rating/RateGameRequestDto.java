@@ -23,6 +23,15 @@ public class RateGameRequestDto {
 
     private List<String> genres;
 
+    @Size(max = 4000)
+    private String summary;
+
+    private List<String> developers;
+
+    private List<String> publishers;
+
+    private List<String> platforms;
+
     @NotNull
     @Min(1)
     @Max(10)
@@ -66,6 +75,38 @@ public class RateGameRequestDto {
 
     public void setGenres(List<String> genres) {
         this.genres = genres;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public List<String> getDevelopers() {
+        return developers;
+    }
+
+    public void setDevelopers(List<String> developers) {
+        this.developers = developers;
+    }
+
+    public List<String> getPublishers() {
+        return publishers;
+    }
+
+    public void setPublishers(List<String> publishers) {
+        this.publishers = publishers;
+    }
+
+    public List<String> getPlatforms() {
+        return platforms;
+    }
+
+    public void setPlatforms(List<String> platforms) {
+        this.platforms = platforms;
     }
 
     public Integer getRating() {

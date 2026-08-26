@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Comparator;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,9 +23,14 @@ public class IgdbGameClient {
     // Edition, Anniversary Edition) qui n'apportent pas de contenu différent du jeu de base.
     private static final String BASE_WHERE = "game_type = (0,8,9,10) & version_parent = null";
 
+    // Taille du lot de résultats pertinents demandé à IGDB avant qu'on les retrie nous-mêmes
+    // par popularité (IGDB refuse de combiner "search" avec "sort" : 406 "Search is sorting
+    // on relevancy and therefore sort is not applicable on search").
+    private static final int SEARCH_POOL_SIZE = 50;
+
     private static final String FIELDS = """
             id,name,summary,game_type,first_release_date,cover.url,
-                   genres.name,platforms.name,rating,aggregated_rating,
+                   genres.name,platforms.name,rating,aggregated_rating,total_rating_count,
                    involved_companies.company.name,involved_companies.developer,involved_companies.publisher,
                    artworks.url,screenshots.url""";
 
@@ -54,6 +60,10 @@ public class IgdbGameClient {
 
         int safeLimit = clampLimit(limit);
 
+        // On récupère un lot plus large de résultats pertinents (triés par IGDB selon la
+        // pertinence textuelle), puis on les retrie nous-mêmes par popularité avant de ne
+        // garder que les "safeLimit" premiers : les jeux les plus connus remontent en premier
+        // sans perdre la pertinence de la recherche elle-même.
         String igdbQuery = """
             search "%s";
             fields %s;
@@ -64,10 +74,17 @@ public class IgdbGameClient {
                         escapeSearch(search),
                         FIELDS,
                         BASE_WHERE,
-                        safeLimit
+                        SEARCH_POOL_SIZE
                 );
 
-        return execute(igdbQuery);
+        return execute(igdbQuery).stream()
+                .sorted(Comparator.comparingLong(this::popularity).reversed())
+                .limit(safeLimit)
+                .toList();
+    }
+
+    private long popularity(IgdbGameResult result) {
+        return result.totalRatingCount() != null ? result.totalRatingCount() : 0L;
     }
 
     public List<IgdbGameResult> discoverGames(

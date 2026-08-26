@@ -3,6 +3,8 @@ package be.technifutur.dal.rating;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 
 @Entity
 @Table(name = "game_rating", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "igdb_game_id"}))
@@ -27,10 +29,36 @@ public class GameRatingEntity {
     @Column(name = "release_date")
     private Long releaseDate;
 
+    // @Fetch(SUBSELECT) sur les 4 collections : quand on charge une liste de notes (ex. la
+    // collection d'un utilisateur), Hibernate ne fait plus une requête par ligne et par
+    // collection (N+1, jusqu'à 4×N requêtes) mais une seule requête par collection pour
+    // l'ensemble du lot, via une sous-requête réutilisant le WHERE de la requête principale.
     @ElementCollection
     @CollectionTable(name = "game_rating_genre", joinColumns = @JoinColumn(name = "game_rating_id"))
     @Column(name = "genre", length = 100)
+    @Fetch(FetchMode.SUBSELECT)
     private List<String> genres;
+
+    @Column(columnDefinition = "text")
+    private String summary;
+
+    @ElementCollection
+    @CollectionTable(name = "game_rating_developer", joinColumns = @JoinColumn(name = "game_rating_id"))
+    @Column(name = "developer", length = 255)
+    @Fetch(FetchMode.SUBSELECT)
+    private List<String> developers;
+
+    @ElementCollection
+    @CollectionTable(name = "game_rating_publisher", joinColumns = @JoinColumn(name = "game_rating_id"))
+    @Column(name = "publisher", length = 255)
+    @Fetch(FetchMode.SUBSELECT)
+    private List<String> publishers;
+
+    @ElementCollection
+    @CollectionTable(name = "game_rating_platform", joinColumns = @JoinColumn(name = "game_rating_id"))
+    @Column(name = "platform", length = 100)
+    @Fetch(FetchMode.SUBSELECT)
+    private List<String> platforms;
 
     @Column(nullable = false)
     private Integer rating;
@@ -100,6 +128,38 @@ public class GameRatingEntity {
 
     public void setGenres(List<String> genres) {
         this.genres = genres;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public List<String> getDevelopers() {
+        return developers;
+    }
+
+    public void setDevelopers(List<String> developers) {
+        this.developers = developers;
+    }
+
+    public List<String> getPublishers() {
+        return publishers;
+    }
+
+    public void setPublishers(List<String> publishers) {
+        this.publishers = publishers;
+    }
+
+    public List<String> getPlatforms() {
+        return platforms;
+    }
+
+    public void setPlatforms(List<String> platforms) {
+        this.platforms = platforms;
     }
 
     public Integer getRating() {

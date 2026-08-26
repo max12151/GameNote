@@ -20,7 +20,9 @@ public class UserEntity {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "avatar_url")
+    // TEXT (pas de longueur fixe) car l'avatar est stocké en data URI base64
+    // (recadré/compressé côté navigateur), pas comme une simple URL courte.
+    @Column(name = "avatar_url", columnDefinition = "text")
     private String avatarUrl;
 
     @Column(columnDefinition = "text")

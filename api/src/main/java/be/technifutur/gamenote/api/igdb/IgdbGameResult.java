@@ -25,6 +25,9 @@ public record IgdbGameResult(
         @JsonProperty("aggregated_rating")
         Double aggregatedRating,
 
+        @JsonProperty("total_rating_count")
+        Long totalRatingCount,
+
         @JsonProperty("involved_companies")
         List<InvolvedCompany> involvedCompanies,
 
