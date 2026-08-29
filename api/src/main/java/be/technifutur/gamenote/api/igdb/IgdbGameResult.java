@@ -28,6 +28,10 @@ public record IgdbGameResult(
         @JsonProperty("total_rating_count")
         Long totalRatingCount,
 
+        // Nombre de joueurs ayant ajoute le jeu a leur liste d'attente avant sa sortie :
+        // c'est l'indicateur d'attente qu'IGDB expose pour les titres pas encore parus.
+        Long hypes,
+
         @JsonProperty("involved_companies")
         List<InvolvedCompany> involvedCompanies,
 

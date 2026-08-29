@@ -12,9 +12,11 @@ import java.util.List;
 public class IgdbController {
 
     private final IgdbGameClient igdbGameClient;
+    private final UpcomingGamePool upcomingGamePool;
 
-    public IgdbController(IgdbGameClient igdbGameClient) {
+    public IgdbController(IgdbGameClient igdbGameClient, UpcomingGamePool upcomingGamePool) {
         this.igdbGameClient = igdbGameClient;
+        this.upcomingGamePool = upcomingGamePool;
     }
 
     @GetMapping("/games")
@@ -23,6 +25,16 @@ public class IgdbController {
             @RequestParam(defaultValue = "20") int limit
     ) {
         return igdbGameClient.searchGames(search, limit).stream()
+                .map(IgdbGameDto::from)
+                .toList();
+    }
+
+    /** Jeux pas encore sortis, du plus attendu au moins attendu. */
+    @GetMapping("/upcoming")
+    public List<IgdbGameDto> upcomingGames(
+            @RequestParam(defaultValue = "12") int limit
+    ) {
+        return upcomingGamePool.getMostAnticipated(limit).stream()
                 .map(IgdbGameDto::from)
                 .toList();
     }

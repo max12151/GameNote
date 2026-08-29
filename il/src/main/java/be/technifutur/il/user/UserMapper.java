@@ -19,6 +19,7 @@ public class UserMapper {
         dto.setEmail(entity.getEmail());
         dto.setAvatarUrl(entity.getAvatarUrl());
         dto.setBio(entity.getBio());
+        dto.setRole(entity.getRole().name());
         dto.setCreatedAt(entity.getCreatedAt());
         return dto;
     }

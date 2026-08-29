@@ -9,6 +9,8 @@ public record RatingStats(
         String topGenre,
         int topGenreCount,
         GameRatingEntity bestRatedGame,
-        List<GenreCount> genreBreakdown
+        List<GenreCount> genreBreakdown,
+        List<RatingBucket> ratingDistribution,
+        TasteComparison tasteComparison
 ) {
 }

@@ -16,7 +16,8 @@ public record IgdbGameDto(
         List<String> developers,
         List<String> publishers,
         Double rating,
-        Double aggregatedRating
+        Double aggregatedRating,
+        Long hypes
 ) {
     public static IgdbGameDto from(IgdbGameResult r) {
         return new IgdbGameDto(
@@ -32,7 +33,8 @@ public record IgdbGameDto(
                 companiesOfType(r.involvedCompanies(), true),
                 companiesOfType(r.involvedCompanies(), false),
                 r.rating(),
-                r.aggregatedRating()
+                r.aggregatedRating(),
+                r.hypes()
         );
     }
 

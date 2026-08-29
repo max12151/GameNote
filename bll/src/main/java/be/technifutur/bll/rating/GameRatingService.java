@@ -1,11 +1,14 @@
 package be.technifutur.bll.rating;
 
 import be.technifutur.bll.exception.ResourceNotFoundException;
+import be.technifutur.dal.rating.CommunityGameView;
 import be.technifutur.dal.rating.GameRatingEntity;
 import be.technifutur.dal.rating.GameRatingRepository;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class GameRatingService {
 
     private static final int GENRE_BREAKDOWN_SIZE = 5;
+
+    /** En deçà d'un demi-point d'écart, on considère que l'avis rejoint celui du site. */
+    private static final double ALIGNMENT_THRESHOLD = 0.5;
 
     private final GameRatingRepository gameRatingRepository;
 
@@ -63,6 +69,10 @@ public class GameRatingService {
         return gameRatingRepository.findIgdbGameIdsByUserId(userId);
     }
 
+    public Optional<GameRatingEntity> findRating(Long userId, Long igdbGameId) {
+        return gameRatingRepository.findByUserIdAndIgdbGameId(userId, igdbGameId);
+    }
+
     @Transactional
     public void removeRating(Long userId, Long igdbGameId) {
         GameRatingEntity entity = gameRatingRepository.findByUserIdAndIgdbGameId(userId, igdbGameId)
@@ -75,7 +85,7 @@ public class GameRatingService {
         List<GameRatingEntity> ratings = getRatingsForUser(userId);
 
         if (ratings.isEmpty()) {
-            return new RatingStats(0, null, null, 0, null, List.of());
+            return new RatingStats(0, null, null, 0, null, List.of(), List.of(), TasteComparison.empty());
         }
 
         double average = ratings.stream()
@@ -105,7 +115,70 @@ public class GameRatingService {
                 topGenre != null ? topGenre.genre() : null,
                 topGenre != null ? (int) topGenre.count() : 0,
                 bestRatedGame,
-                genreBreakdown
+                genreBreakdown,
+                buildDistribution(ratings),
+                compareWithCommunity(ratings)
         );
+    }
+
+    /**
+     * Histogramme des notes de l'utilisateur, calculé sur la liste déjà chargée : aucune
+     * requête supplémentaire n'est nécessaire.
+     */
+    private List<RatingBucket> buildDistribution(List<GameRatingEntity> ratings) {
+        Map<Integer, Long> counts = ratings.stream()
+                .collect(Collectors.groupingBy(GameRatingEntity::getRating, Collectors.counting()));
+
+        return java.util.stream.IntStream.rangeClosed(1, 10)
+                .mapToObj(note -> new RatingBucket(note, counts.getOrDefault(note, 0L)))
+                .toList();
+    }
+
+    /**
+     * Situe l'utilisateur par rapport au reste du site : note-t-il plus sévèrement, plus
+     * généreusement, ou comme les autres ? Une seule requête agrégée ramène les moyennes
+     * de tous ses jeux d'un coup.
+     */
+    private TasteComparison compareWithCommunity(List<GameRatingEntity> ratings) {
+        List<Long> igdbGameIds = ratings.stream().map(GameRatingEntity::getIgdbGameId).toList();
+
+        Map<Long, Double> siteAverages = gameRatingRepository.findCommunityAveragesFor(igdbGameIds).stream()
+                .filter(view -> view.getAverageRating() != null)
+                .collect(Collectors.toMap(CommunityGameView::getIgdbGameId, CommunityGameView::getAverageRating));
+
+        if (siteAverages.isEmpty()) {
+            return TasteComparison.empty();
+        }
+
+        double totalDelta = 0;
+        int compared = 0;
+        int stricter = 0;
+        int aligned = 0;
+        int generous = 0;
+
+        for (GameRatingEntity rating : ratings) {
+            Double siteAverage = siteAverages.get(rating.getIgdbGameId());
+            if (siteAverage == null) {
+                continue;
+            }
+
+            double delta = rating.getRating() - siteAverage;
+            totalDelta += delta;
+            compared++;
+
+            if (delta <= -ALIGNMENT_THRESHOLD) {
+                stricter++;
+            } else if (delta >= ALIGNMENT_THRESHOLD) {
+                generous++;
+            } else {
+                aligned++;
+            }
+        }
+
+        if (compared == 0) {
+            return TasteComparison.empty();
+        }
+
+        return new TasteComparison(totalDelta / compared, compared, stricter, aligned, generous);
     }
 }

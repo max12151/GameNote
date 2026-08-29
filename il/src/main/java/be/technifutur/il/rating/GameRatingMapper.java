@@ -2,10 +2,13 @@ package be.technifutur.il.rating;
 
 import be.technifutur.bll.rating.GenreCount;
 import be.technifutur.bll.rating.RatingStats;
+import be.technifutur.bll.rating.TasteComparison;
 import be.technifutur.dal.rating.GameRatingEntity;
 import be.technifutur.dl.rating.GameRatingDto;
 import be.technifutur.dl.rating.GenreCountDto;
+import be.technifutur.dl.rating.RatingBucketDto;
 import be.technifutur.dl.rating.RatingStatsDto;
+import be.technifutur.dl.rating.TasteComparisonDto;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -43,7 +46,21 @@ public class GameRatingMapper {
         dto.setGenreBreakdown(stats.genreBreakdown().stream()
                 .map(this::toGenreCountDto)
                 .toList());
+        dto.setRatingDistribution(stats.ratingDistribution().stream()
+                .map(bucket -> new RatingBucketDto(bucket.rating(), bucket.count()))
+                .toList());
+        dto.setTasteComparison(toTasteComparisonDto(stats.tasteComparison()));
         return dto;
+    }
+
+    private TasteComparisonDto toTasteComparisonDto(TasteComparison comparison) {
+        return new TasteComparisonDto(
+                comparison.averageDelta(),
+                comparison.comparedGames(),
+                comparison.stricter(),
+                comparison.aligned(),
+                comparison.generous()
+        );
     }
 
     private GenreCountDto toGenreCountDto(GenreCount genreCount) {

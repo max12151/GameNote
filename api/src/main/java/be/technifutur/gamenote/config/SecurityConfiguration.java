@@ -33,6 +33,13 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/igdb/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Vitrine de la page d'accueil : le classement du site est une donnée
+                        // agrégée, sans rien de personnel, et doit être visible d'un visiteur
+                        // pas encore inscrit. La fiche détaillée, elle, reste protégée : elle
+                        // expose la note et le commentaire de l'utilisateur courant.
+                        .requestMatchers(HttpMethod.GET, "/api/community/games").permitAll()
+                        // Une balise <img> ne peut pas porter le jeton JWT ; cf. AvatarController.
+                        .requestMatchers(HttpMethod.GET, "/api/users/*/avatar").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

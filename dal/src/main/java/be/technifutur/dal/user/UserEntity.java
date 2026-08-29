@@ -28,6 +28,13 @@ public class UserEntity {
     @Column(columnDefinition = "text")
     private String bio;
 
+    // Colonne volontairement nullable : avec ddl-auto=update, Hibernate ne peut pas ajouter
+    // une colonne NOT NULL à une table déjà peuplée. Les comptes créés avant l'arrivée des
+    // rôles ont donc role = null, que getRole() interprète comme USER.
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private UserRole role = UserRole.USER;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -87,6 +94,18 @@ public class UserEntity {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public UserRole getRole() {
+        return role != null ? role : UserRole.USER;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
+    }
+
+    public boolean isAdmin() {
+        return getRole() == UserRole.ADMIN;
     }
 
     public OffsetDateTime getCreatedAt() {

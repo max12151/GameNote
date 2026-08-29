@@ -9,6 +9,7 @@ public class UserDto {
     private String email;
     private String avatarUrl;
     private String bio;
+    private String role;
     private OffsetDateTime createdAt;
 
     public Long getId() {
@@ -49,6 +50,14 @@ public class UserDto {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public OffsetDateTime getCreatedAt() {

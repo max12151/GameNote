@@ -5,6 +5,7 @@ import be.technifutur.bll.exception.InvalidCredentialsException;
 import be.technifutur.bll.exception.ResourceNotFoundException;
 import be.technifutur.dal.user.UserEntity;
 import be.technifutur.dal.user.UserRepository;
+import be.technifutur.dal.user.UserRole;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,9 +44,27 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setAvatarUrl(avatarUrl);
         user.setBio(bio);
+        user.setRole(UserRole.USER);
         user.setCreatedAt(OffsetDateTime.now());
 
         return userRepository.save(user);
+    }
+
+    /**
+     * Change le rôle d'un compte. Renvoie {@code false} si le compte n'existe pas ou porte
+     * déjà ce rôle, pour que l'appelant sache s'il y a réellement eu une promotion.
+     */
+    @Transactional
+    public boolean setRole(String username, UserRole role) {
+        UserEntity user = userRepository.findByUsername(username).orElse(null);
+
+        if (user == null || user.getRole() == role) {
+            return false;
+        }
+
+        user.setRole(role);
+        userRepository.save(user);
+        return true;
     }
 
     @Transactional
@@ -62,6 +81,16 @@ public class UserService {
 
     public Optional<UserEntity> findByUsername(String username) {
         return userRepository.findByUsername(username);
+    }
+
+    /**
+     * Version de {@link #findByUsername(String)} pour les appelants qui travaillent déjà
+     * sur un utilisateur authentifié : son absence en base est une anomalie, pas un cas
+     * fonctionnel à traiter à chaque appel.
+     */
+    public UserEntity getByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
     }
 
     @Transactional

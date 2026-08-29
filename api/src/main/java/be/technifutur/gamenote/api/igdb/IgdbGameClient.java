@@ -10,9 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Comparator;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class IgdbGameClient {
@@ -28,11 +26,22 @@ public class IgdbGameClient {
     // on relevancy and therefore sort is not applicable on search").
     private static final int SEARCH_POOL_SIZE = 50;
 
+    // Plafond imposé par IGDB sur le paramètre "limit".
+    private static final int MAX_IGDB_LIMIT = 500;
+
     private static final String FIELDS = """
             id,name,summary,game_type,first_release_date,cover.url,
                    genres.name,platforms.name,rating,aggregated_rating,total_rating_count,
                    involved_companies.company.name,involved_companies.developer,involved_companies.publisher,
                    artworks.url,screenshots.url""";
+
+    // La page Découvrir n'affiche qu'une jaquette : demander en plus les artworks et les
+    // captures d'écran alourdirait fortement la réponse pour des centaines de jeux, sans
+    // rien apporter à l'écran.
+    private static final String DISCOVER_FIELDS = """
+            id,name,summary,game_type,first_release_date,cover.url,
+                   genres.name,platforms.name,rating,aggregated_rating,total_rating_count,
+                   involved_companies.company.name,involved_companies.developer,involved_companies.publisher""";
 
     private final RestTemplate restTemplate;
     private final IgdbProperties properties;
@@ -87,26 +96,22 @@ public class IgdbGameClient {
         return result.totalRatingCount() != null ? result.totalRatingCount() : 0L;
     }
 
-    public List<IgdbGameResult> discoverGames(
-            String genre,
-            Collection<Long> excludedIgdbGameIds,
-            int limit,
-            int offset
-    ) {
-        int safeLimit = clampLimit(limit);
-        int safeOffset = Math.max(offset, 0);
-
-        StringBuilder where = new StringBuilder(BASE_WHERE);
+    /**
+     * Les {@code poolSize} jeux les plus populaires (optionnellement d'un genre donné).
+     * <p>
+     * Contrairement à un affichage paginé, on ramène ici un vivier entier en une requête :
+     * c'est dedans que la page Découvrir pioche au hasard, et le vivier est mis en cache
+     * pour être partagé par tous les utilisateurs (cf. {@code PopularGamePool}).
+     * <p>
+     * {@code total_rating_count != null} écarte les jeux sans aucun vote, dont le classement
+     * par popularité n'aurait aucun sens.
+     */
+    public List<IgdbGameResult> fetchMostPopular(String genre, int poolSize) {
+        StringBuilder where = new StringBuilder(BASE_WHERE)
+                .append(" & total_rating_count != null");
 
         if (genre != null && !genre.isBlank()) {
             where.append(" & genres.name = \"").append(escapeSearch(genre)).append('"');
-        }
-
-        if (excludedIgdbGameIds != null && !excludedIgdbGameIds.isEmpty()) {
-            String ids = excludedIgdbGameIds.stream()
-                    .map(String::valueOf)
-                    .collect(Collectors.joining(","));
-            where.append(" & id != (").append(ids).append(')');
         }
 
         String igdbQuery = """
@@ -114,13 +119,38 @@ public class IgdbGameClient {
             where %s;
             sort total_rating_count desc;
             limit %d;
-            offset %d;
             """
                 .formatted(
-                        FIELDS,
+                        DISCOVER_FIELDS,
                         where,
-                        safeLimit,
-                        safeOffset
+                        Math.min(Math.max(poolSize, 1), MAX_IGDB_LIMIT)
+                );
+
+        return execute(igdbQuery);
+    }
+
+    /**
+     * Jeux pas encore sortis, du plus attendu au moins attendu.
+     * <p>
+     * {@code hypes} est le compteur d'attente d'IGDB (nombre de joueurs ayant ajouté le
+     * titre à leur liste avant sa sortie) : c'est lui qui donne le classement, et non la
+     * note, qui n'existe évidemment pas encore. On exige une jaquette et une date, sans
+     * quoi la carte n'aurait rien à montrer.
+     */
+    public List<IgdbGameResult> fetchUpcoming(int limit) {
+        long now = java.time.Instant.now().getEpochSecond();
+
+        String igdbQuery = """
+            fields %s,hypes;
+            where %s & first_release_date > %d & hypes != null & cover != null;
+            sort hypes desc;
+            limit %d;
+            """
+                .formatted(
+                        DISCOVER_FIELDS,
+                        BASE_WHERE,
+                        now,
+                        Math.min(Math.max(limit, 1), MAX_IGDB_LIMIT)
                 );
 
         return execute(igdbQuery);
