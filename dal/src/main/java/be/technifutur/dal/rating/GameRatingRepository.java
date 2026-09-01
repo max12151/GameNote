@@ -55,13 +55,23 @@ public interface GameRatingRepository extends JpaRepository<GameRatingEntity, Lo
                    avg(r.rating) as averageRating,
                    count(r) as ratingCount
             from GameRatingEntity r
+            where lower(r.title) like lower(concat('%', :search, '%'))
             group by r.igdbGameId
             order by avg(r.rating) desc, count(r) desc, max(r.title) asc
             """)
-    List<CommunityGameView> findCommunityRanking(Pageable pageable);
+    List<CommunityGameView> findCommunityRanking(@Param("search") String search, Pageable pageable);
 
-    @Query("select count(distinct r.igdbGameId) from GameRatingEntity r")
-    long countRatedGames();
+    /**
+     * Le filtre porte la recherche et le classement complet à la fois : une recherche vide
+     * donne {@code like '%%'}, qui laisse tout passer. Une seule requête à maintenir plutôt
+     * que deux variantes qui divergeraient au premier changement de tri.
+     */
+    @Query("""
+            select count(distinct r.igdbGameId)
+            from GameRatingEntity r
+            where lower(r.title) like lower(concat('%', :search, '%'))
+            """)
+    long countRatedGames(@Param("search") String search);
 
     /**
      * Moyennes du site pour une liste de jeux donnée, en une seule requête.

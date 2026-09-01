@@ -15,7 +15,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class UpcomingGamePool {
 
-    private static final int POOL_SIZE = 24;
+    /**
+     * Volontairement plus large que ce que l'accueil affiche. IGDB facture la requête, pas
+     * les lignes : ramener 40 jeux ou 8 coûte exactement un appel. Garder de la marge permet
+     * de changer le nombre de cartes affichées sans repasser par le réseau, et absorbe les
+     * jeux qui sortiraient entre deux reconstructions du cache.
+     */
+    private static final int POOL_SIZE = 40;
+
     private static final Duration TTL = Duration.ofHours(6);
 
     private final IgdbGameClient igdbGameClient;

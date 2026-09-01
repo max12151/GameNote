@@ -1,11 +1,11 @@
 package be.technifutur.bll.community;
 
-import be.technifutur.bll.exception.ResourceNotFoundException;
 import be.technifutur.dal.rating.CommunityGameView;
 import be.technifutur.dal.rating.GameRatingEntity;
 import be.technifutur.dal.rating.GameRatingRepository;
 import be.technifutur.dal.rating.RatingBucketView;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -21,26 +21,44 @@ public class CommunityService {
     }
 
     /**
-     * Classement des jeux notés sur le site, du mieux noté au moins bien noté.
-     * L'agrégation est faite par la base : seule la page demandée est chargée.
+     * Classement des jeux notés sur le site, du mieux noté au moins bien noté, filtré sur
+     * le titre quand une recherche est fournie.
+     * <p>
+     * Le filtrage est fait par la base, et non sur la page déjà chargée : sans cela, un jeu
+     * classé au-delà de la première page resterait introuvable tant qu'on n'aurait pas
+     * déroulé le classement jusqu'à lui.
      */
-    public CommunityRanking getRanking(int page, int size) {
+    public CommunityRanking getRanking(int page, int size, String search) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        String safeSearch = search == null ? "" : search.strip();
 
         // PageRequest volontairement non trié : le tri porte sur des agrégats et est déjà
         // écrit dans la requête du repository (cf. findCommunityRanking).
         List<CommunityGameView> games =
-                gameRatingRepository.findCommunityRanking(PageRequest.of(safePage, safeSize));
+                gameRatingRepository.findCommunityRanking(safeSearch, PageRequest.of(safePage, safeSize));
 
-        return new CommunityRanking(games, gameRatingRepository.countRatedGames(), safePage, safeSize);
+        return new CommunityRanking(
+                games,
+                gameRatingRepository.countRatedGames(safeSearch),
+                safePage,
+                safeSize
+        );
     }
 
-    public CommunityGameDetail getGameDetail(Long igdbGameId) {
-        GameRatingEntity game = gameRatingRepository
+    /**
+     * Fiche communautaire d'un jeu, ou {@link Optional#empty()} si personne ne l'a encore
+     * noté. L'absence d'avis n'est pas une erreur : l'appelant peut alors présenter le jeu
+     * en invitant à être le premier à le noter.
+     */
+    public Optional<CommunityGameDetail> findGameDetail(Long igdbGameId) {
+        Optional<GameRatingEntity> game = gameRatingRepository
                 .findDescriptiveRatings(igdbGameId, PageRequest.of(0, 1)).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Aucun avis pour ce jeu"));
+                .findFirst();
+
+        if (game.isEmpty()) {
+            return Optional.empty();
+        }
 
         List<RatingBucketView> distribution = gameRatingRepository.findRatingDistribution(igdbGameId);
 
@@ -56,6 +74,6 @@ public class CommunityService {
 
         double averageRating = ratingCount == 0 ? 0 : (double) weightedSum / ratingCount;
 
-        return new CommunityGameDetail(game, averageRating, ratingCount, distribution);
+        return Optional.of(new CommunityGameDetail(game.get(), averageRating, ratingCount, distribution));
     }
 }

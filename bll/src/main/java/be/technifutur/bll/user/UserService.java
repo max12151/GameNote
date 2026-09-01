@@ -93,6 +93,15 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
     }
 
+    /**
+     * Lecture par identifiant, pour les pages qui parlent d'un joueur autre que celui qui
+     * est connecté. Renvoie un {@link Optional} plutôt que de lever : l'identifiant vient
+     * d'une URL, un profil supprimé ou inventé est un 404 ordinaire, pas une anomalie.
+     */
+    public Optional<UserEntity> findById(Long id) {
+        return userRepository.findById(id);
+    }
+
     @Transactional
     public UserEntity updateProfile(String username, String bio, String avatarUrl) {
         UserEntity user = userRepository.findByUsername(username)

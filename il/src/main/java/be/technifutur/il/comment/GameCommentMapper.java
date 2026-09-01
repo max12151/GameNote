@@ -3,6 +3,8 @@ package be.technifutur.il.comment;
 import be.technifutur.dal.comment.GameCommentEntity;
 import be.technifutur.dal.comment.GameCommentView;
 import be.technifutur.dl.comment.GameCommentDto;
+import be.technifutur.dl.comment.RecentCommentDto;
+import be.technifutur.dal.comment.RecentGameCommentView;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -47,6 +49,26 @@ public class GameCommentMapper {
                 authorRating,
                 true,
                 true
+        );
+    }
+
+    /**
+     * Commentaire affiché hors de la fiche de son jeu : le jeu devient une information à
+     * montrer, et les droits de modération disparaissent — on ne supprime rien depuis un
+     * flux, on y clique pour rejoindre la fiche.
+     */
+    public RecentCommentDto toRecentDto(RecentGameCommentView view) {
+        return new RecentCommentDto(
+                view.getId(),
+                view.getIgdbGameId(),
+                view.getGameTitle(),
+                view.getGameCoverUrl(),
+                view.getContent(),
+                view.getCreatedAt(),
+                view.getAuthorId(),
+                view.getAuthorUsername(),
+                view.getAuthorHasAvatar(),
+                view.getAuthorRating()
         );
     }
 }

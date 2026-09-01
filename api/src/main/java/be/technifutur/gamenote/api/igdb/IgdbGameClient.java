@@ -156,6 +156,22 @@ public class IgdbGameClient {
         return execute(igdbQuery);
     }
 
+    /**
+     * Un jeu précis par son identifiant IGDB. Sert à présenter une fiche communautaire pour
+     * un titre que personne n'a encore noté : la base du site n'en a alors aucune trace, et
+     * IGDB reste la seule source de ses métadonnées.
+     */
+    public java.util.Optional<IgdbGameResult> fetchById(Long igdbGameId) {
+        String igdbQuery = """
+            fields %s;
+            where id = %d;
+            limit 1;
+            """
+                .formatted(DISCOVER_FIELDS, igdbGameId);
+
+        return execute(igdbQuery).stream().findFirst();
+    }
+
     private List<IgdbGameResult> execute(String igdbQuery) {
         HttpHeaders headers = new HttpHeaders();
 

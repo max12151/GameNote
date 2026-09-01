@@ -63,7 +63,8 @@ public class GameRatingMapper {
         );
     }
 
-    private GenreCountDto toGenreCountDto(GenreCount genreCount) {
+    /** Publique : le profil public d'un joueur affiche la même répartition par genre. */
+    public GenreCountDto toGenreCountDto(GenreCount genreCount) {
         return new GenreCountDto(genreCount.genre(), genreCount.count());
     }
 }
