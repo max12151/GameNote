@@ -5,9 +5,12 @@ spring:
   application:
     name: GameNote
   datasource:
-    url: jdbc:postgresql://localhost:5440/postgres
-    username: postgres
-    password: postgres
+    # Valeurs de repli = poste de développement. Elles restent lisibles dans le dépôt, ce
+    # qui est acceptable parce qu'elles ne donnent accès à rien d'autre qu'un Postgres
+    # local ; toute autre machine passe par les variables d'environnement.
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5440/postgres}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,6 +25,10 @@ igdb:
   api-url: https://api.igdb.com/v4
 
 gamenote:
+  # Origines autorisées à appeler l'API depuis un navigateur. Le serveur de développement
+  # Angular par défaut ; en production, la liste vient de CORS_ALLOWED_ORIGINS.
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
   # Comptes promus administrateur au demarrage (moderation des commentaires).
   # Le compte doit deja exister : sinon il sera promu au prochain demarrage.
   admin-usernames: [Max]

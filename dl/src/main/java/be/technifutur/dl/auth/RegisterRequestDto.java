@@ -19,7 +19,10 @@ public class RegisterRequestDto {
     @Size(min = 8, max = 255)
     private String password;
 
-    @Size(max = 2048)
+    // Même plafond que UpdateProfileRequestDto : une photo arrive en data URI base64, pas
+    // en adresse. À 2048 caractères, on pouvait ajouter son portrait après coup mais jamais
+    // à l'inscription — l'écran d'inscription le propose pourtant.
+    @Size(max = 2_000_000)
     private String avatarUrl;
 
     @Size(max = 1000)
