@@ -1,0 +1,10 @@
+# Tout ce qui n'entre pas dans la construction de l'image : envoyer ces dossiers au
+# démon Docker ralentit chaque build sans rien apporter.
+target/
+*/target/
+.git/
+.idea/
+.mvn/
+docker/
+*.md
+.env

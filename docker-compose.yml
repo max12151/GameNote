@@ -1,0 +1,78 @@
+# Pile complète de développement : base, API et interface.
+#
+#   docker compose up --build
+#   → le site sur http://localhost:8090
+#
+# Les deux dépôts doivent être clonés côte à côte dans le même dossier parent, le front
+# étant construit depuis ../gamenote-ui.
+#
+# Les identifiants IGDB se placent dans un fichier .env à côté de ce fichier (voir
+# .env.example). Sans eux l'application démarre quand même : seules la recherche, la page
+# Découvrir et les sorties à venir restent indisponibles.
+
+name: gamenote
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+    ports:
+      # Même port qu'en local : l'API lancée depuis l'IDE, hors conteneur, continue de
+      # trouver la base sans changer un seul réglage.
+      - "5440:5432"
+    volumes:
+      # /var/lib/postgresql et non .../data : depuis PostgreSQL 18, l'image range les
+      # données dans un sous-dossier nommé d'après la version majeure, et refuse de
+      # démarrer si le volume est monté sur l'ancien chemin.
+      - db-data:/var/lib/postgresql
+      # Rejoué uniquement quand le volume est vide, c'est-à-dire au tout premier
+      # démarrage : schéma et données de démonstration. Pour repartir de zéro,
+      # `docker compose down -v` supprime le volume et le prochain `up` rejoue le script.
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    environment:
+      # `db` est le nom du service : le réseau de compose le résout tout seul.
+      DATABASE_URL: jdbc:postgresql://db:5432/postgres
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-secret-de-developpement-a-remplacer-en-production-0123456789}
+      # nginx relaie /api vers ce conteneur : le navigateur ne voit qu'une seule origine
+      # et aucune requête inter-origines n'a lieu. La valeur ci-dessous ne sert qu'au
+      # serveur Angular lancé en local par-dessus la pile (npm start sur le port 4200).
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8090}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+    ports:
+      # 8081 et non 8080 : le port 8080 reste libre pour l'instance lancée depuis l'IDE,
+      # les deux peuvent donc tourner en même temps. Documentation OpenAPI sur
+      # http://localhost:8081/swagger-ui.html
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../gamenote-ui
+    ports:
+      - "8090:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:

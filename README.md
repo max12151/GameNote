@@ -4,7 +4,62 @@ Site de notation de jeux vidéo : chacun note ce qu'il a joué, commente, et ret
 classement de la communauté. Ce dépôt contient l'API ; l'interface Angular vit dans un
 dépôt séparé (`gamenote-ui`).
 
-## Prérequis
+## Démarrer — tout en conteneurs
+
+Le chemin le plus court sur une machine neuve : ni Java, ni Maven, ni Node à installer.
+
+```bash
+git clone https://github.com/max12151/GameNote.git
+git clone https://github.com/max12151/gamenote-ui.git
+cd GameNote
+cp .env.example .env      # y mettre les identifiants IGDB
+docker compose up --build
+```
+
+**Les deux dépôts doivent être clonés côte à côte** dans le même dossier parent : le
+service `web` construit l'interface depuis `../gamenote-ui`.
+
+| | Adresse |
+|---|---|
+| Site | http://localhost:8090 |
+| API | http://localhost:8081 — documentation sur `/swagger-ui.html` |
+| Base | `localhost:5440`, base `postgres` |
+
+La base se remplit toute seule au premier démarrage avec `docker/db/init/` : 33 comptes,
+830 notes et 330 avis sur 200 jeux, de quoi voir un classement peuplé sans rien saisir.
+**Tous les comptes de cet export ouvrent avec `Password123!`**, `Max` étant administrateur.
+
+Cet export est un jeu de démonstration, pas une sauvegarde : les empreintes de mot de passe
+des trois comptes personnels y ont été remplacées par celle du mot de passe ci-dessus. Le
+dépôt étant public, y publier de vraies empreintes n'aurait rien apporté et aurait exposé
+un mot de passe éventuellement réutilisé ailleurs. Une vraie sauvegarde se fait à part :
+
+```bash
+docker compose exec db pg_dump -U postgres postgres > sauvegarde.sql
+```
+
+Le script d'initialisation n'est rejoué que sur un volume vide. Pour repartir de zéro :
+
+```bash
+docker compose down -v && docker compose up --build
+```
+
+> **Sur la machine où le projet a été développé**, un conteneur `postgres` occupe déjà le
+> port 5440 et empêchera la pile de démarrer. Ses données sont dans l'export ci-dessus :
+> `docker rm -f postgres` avant le premier `docker compose up`.
+
+Le port `8080` reste libre : l'API lancée depuis l'IDE et celle du conteneur peuvent
+tourner en même temps. La base étant publiée sur `5440`, l'instance de l'IDE s'y connecte
+sans changer un réglage — pratique pour développer l'API contre les données de démo.
+
+Pour travailler sur l'interface avec rechargement à chaud, garder la pile en marche et
+lancer `npm start` par-dessus dans `gamenote-ui` : le serveur Angular du port 4200 tape
+alors sur l'API du port 8080 (celle de l'IDE) ou 8081 (celle du conteneur), selon
+`src/environments/environments.ts`.
+
+## Prérequis — installation classique
+
+Seulement si tu ne passes pas par Docker.
 
 | | Version | Remarque |
 |---|---|---|
