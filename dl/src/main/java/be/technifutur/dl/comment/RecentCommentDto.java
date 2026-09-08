@@ -10,6 +10,11 @@ import java.time.OffsetDateTime;
  * {@link GameCommentDto} : on ne modère pas depuis ces listes, on y renvoie vers la fiche
  * du jeu. Y transporter des droits qu'aucun bouton n'utilise reviendrait à publier une
  * information sur l'utilisateur courant sans raison.
+ * <p>
+ * Le compteur « utile », lui, y figure : il se lit sans rien pouvoir en faire, comme la note.
+ *
+ * @param authorDeleted vrai si l'auteur a depuis supprimé son compte : son pseudo reste
+ *                      affiché mais ne mène plus à un profil
  */
 public record RecentCommentDto(Long id,
                                Long igdbGameId,
@@ -20,5 +25,7 @@ public record RecentCommentDto(Long id,
                                Long authorId,
                                String authorUsername,
                                boolean authorHasAvatar,
-                               Integer authorRating) {
+                               boolean authorDeleted,
+                               Integer authorRating,
+                               long usefulCount) {
 }

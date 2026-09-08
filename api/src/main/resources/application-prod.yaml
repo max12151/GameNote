@@ -19,11 +19,10 @@ spring:
 
   jpa:
     hibernate:
-      # À passer en `validate` dès que les migrations Flyway existeront. `update` laisse
-      # Hibernate modifier le schéma tout seul : il n'enlève jamais rien, ne renomme pas,
-      # et ne sait pas revenir en arrière — c'est déjà ce qui a contraint la colonne `role`
-      # à rester nullable.
-      ddl-auto: update
+      # Les migrations Flyway existent : Hibernate ne touche plus au schéma, il se contente
+      # de vérifier que les entités correspondent. En production c'est la seule position
+      # tenable — `update` ne sait ni supprimer, ni renommer, ni revenir en arrière.
+      ddl-auto: validate
     # Le journal des requêtes n'a pas sa place en production : il ralentit, remplit les
     # disques, et recopie dans les logs le contenu des tables.
     show-sql: false
@@ -32,6 +31,14 @@ spring:
     # Une pile d'appels renvoyée au client renseigne sur les versions et le découpage du
     # code. GlobalExceptionHandler produit déjà un message lisible pour chaque cas prévu.
     default-property-inclusion: non_null
+
+# La documentation interactive sert à développer, pas à exposer la carte de l'API en
+# production : coupée ici, ses routes n'existent tout simplement plus.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 server:
   error:

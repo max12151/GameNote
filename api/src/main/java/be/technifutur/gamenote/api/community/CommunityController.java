@@ -1,9 +1,13 @@
 package be.technifutur.gamenote.api.community;
 
+import be.technifutur.bll.comment.CommentSort;
+import be.technifutur.bll.community.RankingQuery;
+import be.technifutur.bll.community.RankingSort;
 import be.technifutur.dl.comment.RecentCommentDto;
 import be.technifutur.dl.community.CommunityGameDetailDto;
 import be.technifutur.dl.community.CommunityGameInfoDto;
 import be.technifutur.dl.community.CommunityRankingDto;
+import be.technifutur.dl.community.RankingFacetsDto;
 import be.technifutur.gamenote.api.igdb.IgdbGameClient;
 import be.technifutur.gamenote.api.igdb.IgdbGameDto;
 import be.technifutur.il.community.CommunityFacade;
@@ -36,17 +40,47 @@ public class CommunityController {
 
     /**
      * Classement des jeux par moyenne des notes de tous les joueurs du site.
+     * <p>
+     * Tous les filtres sont appliqués par la base, et non sur la page déjà chargée : sans
+     * cela, un jeu classé au-delà de la première page resterait introuvable tant qu'on
+     * n'aurait pas déroulé le classement jusqu'à lui.
      *
-     * @param search filtre optionnel sur le titre, appliqué par la base afin qu'un jeu classé
-     *               au-delà de la première page reste trouvable
+     * @param search   filtre optionnel sur le titre
+     * @param genre    ne garder que les jeux portant ce genre
+     * @param platform ne garder que les jeux sortis sur cette plateforme
+     * @param yearFrom première année de sortie retenue
+     * @param yearTo   dernière année de sortie retenue
+     * @param sort     WEIGHTED (défaut), AVERAGE, VOTES, RECENT ou TITLE. Une valeur inconnue
+     *                 retombe sur le classement par défaut plutôt que de produire une erreur :
+     *                 le tri est un confort d'affichage, pas une condition de la réponse.
      */
     @GetMapping("/games")
     public ResponseEntity<CommunityRankingDto> getRanking(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String search
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String platform,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false) String sort
     ) {
-        return ResponseEntity.ok(communityFacade.getRanking(page, size, search));
+        RankingQuery query = new RankingQuery(search, genre, platform, yearFrom, yearTo,
+                RankingSort.parse(sort));
+
+        return ResponseEntity.ok(communityFacade.getRanking(page, size, query));
+    }
+
+    /**
+     * Les valeurs proposées dans les filtres du classement.
+     * <p>
+     * Route publique, comme le classement qu'elle accompagne, et servie depuis un cache : ces
+     * listes ne bougent qu'au rythme des jeux notés sur le site. Les renvoyer avec chaque page
+     * de classement ferait repayer une liste identique à chaque changement de page.
+     */
+    @GetMapping("/filters")
+    public ResponseEntity<RankingFacetsDto> getFilters() {
+        return ResponseEntity.ok(communityFacade.getFacets());
     }
 
     /**
@@ -72,9 +106,13 @@ public class CommunityController {
      * premier à le noter. Seul un identifiant inconnu d'IGDB donne un 404.
      */
     @GetMapping("/games/{igdbGameId}")
-    public ResponseEntity<CommunityGameDetailDto> getGameDetail(Authentication authentication,
-                                                                @PathVariable Long igdbGameId) {
-        return communityFacade.findGameDetail(authentication.getName(), igdbGameId)
+    public ResponseEntity<CommunityGameDetailDto> getGameDetail(
+            Authentication authentication,
+            @PathVariable Long igdbGameId,
+            @RequestParam(required = false) String commentSort
+    ) {
+        return communityFacade.findGameDetail(authentication.getName(), igdbGameId,
+                        CommentSort.parse(commentSort))
                 .or(() -> fetchFromIgdb(igdbGameId))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -114,6 +152,9 @@ public class CommunityController {
                 game.platforms()
         );
 
-        return new CommunityGameDetailDto(info, 0, 0, List.of(), List.of(), null, null);
+        // Aucune note, donc aucun avis, aucun statut et aucune liste à signaler : le jeu
+        // n'existe encore que chez IGDB. Le fil est vide, son ordre importe peu.
+        return new CommunityGameDetailDto(info, 0, 0, List.of(), List.of(), null, null, null,
+                List.of(), CommentSort.RECENT.name());
     }
 }

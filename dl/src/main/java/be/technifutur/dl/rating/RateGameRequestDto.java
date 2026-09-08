@@ -37,6 +37,13 @@ public class RateGameRequestDto {
     @Max(10)
     private Integer rating;
 
+    /**
+     * Statut voulu, facultatif. Absent, il laisse l'entrée là où elle est — et place à
+     * « terminé » un jeu qui entre dans la bibliothèque par sa note, puisqu'on note un jeu
+     * après y avoir joué.
+     */
+    private GameStatusDto status;
+
     public Long getIgdbGameId() {
         return igdbGameId;
     }
@@ -115,5 +122,13 @@ public class RateGameRequestDto {
 
     public void setRating(Integer rating) {
         this.rating = rating;
+    }
+
+    public GameStatusDto getStatus() {
+        return status;
+    }
+
+    public void setStatus(GameStatusDto status) {
+        this.status = status;
     }
 }

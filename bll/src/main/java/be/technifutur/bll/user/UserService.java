@@ -1,19 +1,33 @@
 package be.technifutur.bll.user;
 
 import be.technifutur.bll.exception.DuplicateResourceException;
+import be.technifutur.bll.exception.ForbiddenOperationException;
 import be.technifutur.bll.exception.InvalidCredentialsException;
 import be.technifutur.bll.exception.ResourceNotFoundException;
+import be.technifutur.bll.security.AuthenticatedUser;
 import be.technifutur.dal.user.UserEntity;
 import be.technifutur.dal.user.UserRepository;
 import be.technifutur.dal.user.UserRole;
+import be.technifutur.dal.user.UserSearchView;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
+
+    /** En deçà de deux caractères, une recherche de pseudo ne rendrait que du bruit. */
+    private static final int MIN_SEARCH_LENGTH = 2;
+
+    /**
+     * Plafond des résultats. Le nombre voulu vient de l'appelant, mais pas sans limite :
+     * une valeur passée dans l'URL ne doit pas pouvoir demander la table entière.
+     */
+    private static final int MAX_SEARCH_RESULTS = 30;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -76,11 +90,68 @@ public class UserService {
             throw new InvalidCredentialsException("Identifiants invalides");
         }
 
+        // Un compte anonymisé porte l'empreinte d'un mot de passe aléatoire jeté aussitôt :
+        // en pratique on ne passe jamais la vérification ci-dessus. Le cas est traité malgré
+        // tout, et avec le même message qu'un mot de passe faux — dire « ce compte a été
+        // supprimé » renseignerait sur l'existence passée d'un pseudo.
+        if (user.isDeleted()) {
+            throw new InvalidCredentialsException("Identifiants invalides");
+        }
+
+        // La suspension, elle, se dit : le titulaire a le droit de savoir pourquoi il ne
+        // rentre plus, et le message est la seule voie pour le lui apprendre.
+        if (user.isSuspended()) {
+            throw new ForbiddenOperationException(suspensionMessage(user));
+        }
+
         return user;
+    }
+
+    private static String suspensionMessage(UserEntity user) {
+        String reason = user.getSuspensionReason();
+
+        return reason == null || reason.isBlank()
+                ? "Ce compte est suspendu."
+                : "Ce compte est suspendu : " + reason;
+    }
+
+    /**
+     * Membres dont le pseudo contient le terme cherché.
+     * <p>
+     * Un terme vide ou trop court rend une liste vide plutôt que tout le monde : chercher
+     * « a » n'a pas de sens, et laisser passer la requête reviendrait à publier l'annuaire
+     * des comptes du site à qui vide le champ.
+     */
+    public List<UserSearchView> search(String term, int limit) {
+        String safeTerm = term == null ? "" : term.strip();
+
+        if (safeTerm.length() < MIN_SEARCH_LENGTH) {
+            return List.of();
+        }
+
+        return userRepository.searchByUsername(safeTerm,
+                PageRequest.of(0, Math.clamp(limit, 1, MAX_SEARCH_RESULTS)));
     }
 
     public Optional<UserEntity> findByUsername(String username) {
         return userRepository.findByUsername(username);
+    }
+
+    /**
+     * Le porteur d'un jeton, en une projection légère : identifiant, pseudo, rôle et état du
+     * compte.
+     * <p>
+     * Appelée à chaque requête entrante par le filtre d'authentification. Le rôle est lu en
+     * base et non dans le jeton : un administrateur rétrogradé, ou un compte suspendu, doit
+     * perdre ses droits tout de suite, et non à l'expiration d'un jeton valable un jour.
+     */
+    public Optional<AuthenticatedUser> findAuthenticated(String username) {
+        return userRepository.findAuthByUsername(username)
+                .map(view -> new AuthenticatedUser(
+                        view.getId(),
+                        view.getUsername(),
+                        view.getRole() == null ? UserRole.USER : view.getRole(),
+                        view.getSuspendedAt() == null && view.getDeletedAt() == null));
     }
 
     /**
@@ -100,6 +171,20 @@ public class UserService {
      */
     public Optional<UserEntity> findById(Long id) {
         return userRepository.findById(id);
+    }
+
+    /**
+     * Variante employée par les pages publiques.
+     * <p>
+     * Un compte anonymisé n'a plus de profil à montrer ; un compte suspendu ne doit plus en
+     * montrer. Les deux répondent 404, comme un identifiant inventé — dire « ce compte est
+     * suspendu » publierait une décision de modération à qui tape une URL.
+     * <p>
+     * La console d'administration, elle, passe par {@code findById} : c'est justement son
+     * rôle de voir ce que le site cache.
+     */
+    public Optional<UserEntity> findVisibleById(Long id) {
+        return userRepository.findById(id).filter(UserEntity::isActive);
     }
 
     @Transactional

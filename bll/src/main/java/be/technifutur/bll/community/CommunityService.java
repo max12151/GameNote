@@ -5,6 +5,8 @@ import be.technifutur.dal.rating.GameRatingEntity;
 import be.technifutur.dal.rating.GameRatingRepository;
 import be.technifutur.dal.rating.GameVoteView;
 import be.technifutur.dal.rating.RatingBucketView;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
@@ -15,43 +17,109 @@ public class CommunityService {
 
     private static final int MAX_PAGE_SIZE = 50;
 
+    /**
+     * Durée de vie des constantes de pondération et des listes de filtres.
+     * <p>
+     * Les trois se calculent par une agrégation sur toute la table des notes, et le classement
+     * est la page publique du site : sans cache, chaque visiteur — et la sonde de santé du
+     * conteneur, toutes les dix secondes — déclenchait ce balayage. Or ces valeurs bougent à
+     * l'échelle de la journée : la moyenne du site ne se déplace pas d'un vote, et un genre
+     * n'apparaît pas deux fois par heure.
+     */
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+
     private final GameRatingRepository gameRatingRepository;
+
+    private final Object weightsLock = new Object();
+    private volatile RankingWeights cachedWeights;
+    private volatile Instant weightsExpireAt = Instant.EPOCH;
+
+    private final Object facetsLock = new Object();
+    private volatile RankingFacets cachedFacets;
+    private volatile Instant facetsExpireAt = Instant.EPOCH;
 
     public CommunityService(GameRatingRepository gameRatingRepository) {
         this.gameRatingRepository = gameRatingRepository;
     }
 
     /**
-     * Classement des jeux notés sur le site, du mieux noté au moins bien noté, filtré sur
-     * le titre quand une recherche est fournie.
+     * Classement des jeux notés sur le site, filtré et ordonné selon la demande.
      * <p>
      * Le filtrage est fait par la base, et non sur la page déjà chargée : sans cela, un jeu
      * classé au-delà de la première page resterait introuvable tant qu'on n'aurait pas
      * déroulé le classement jusqu'à lui.
      */
-    public CommunityRanking getRanking(int page, int size, String search) {
+    public CommunityRanking getRanking(int page, int size, RankingQuery query) {
         int safePage = Math.max(page, 0);
-        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        String safeSearch = search == null ? "" : search.strip();
+        int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
 
-        RankingWeights weights = computeWeights();
+        RankingWeights weights = getWeights();
 
         // PageRequest volontairement non trié : le tri porte sur des agrégats et est déjà
         // écrit dans la requête du repository (cf. findCommunityRanking).
         List<CommunityRankingView> games = gameRatingRepository.findCommunityRanking(
-                safeSearch,
+                query.search(),
+                query.genre(),
+                query.platform(),
+                query.releasedAfter(),
+                query.releasedBefore(),
+                query.sort().name(),
                 weights.globalAverage(),
                 weights.minimumVotes(),
                 PageRequest.of(safePage, safeSize)
         );
 
-        return new CommunityRanking(
-                games,
-                gameRatingRepository.countRatedGames(safeSearch),
-                safePage,
-                safeSize,
-                weights
+        long total = gameRatingRepository.countRatedGames(
+                query.search(),
+                query.genre(),
+                query.platform(),
+                query.releasedAfter(),
+                query.releasedBefore()
         );
+
+        return new CommunityRanking(games, total, safePage, safeSize, weights, query);
+    }
+
+    /**
+     * Les valeurs proposées dans les filtres : celles qui existent réellement dans le
+     * classement, jamais une liste écrite à la main qui finirait par mentionner un genre que
+     * personne n'a noté.
+     */
+    public RankingFacets getFacets() {
+        if (Instant.now().isBefore(facetsExpireAt)) {
+            return cachedFacets;
+        }
+
+        synchronized (facetsLock) {
+            if (Instant.now().isBefore(facetsExpireAt)) {
+                return cachedFacets;
+            }
+
+            cachedFacets = new RankingFacets(
+                    List.copyOf(gameRatingRepository.findDistinctGenres()),
+                    List.copyOf(gameRatingRepository.findDistinctPlatforms())
+            );
+            facetsExpireAt = Instant.now().plus(CACHE_TTL);
+
+            return cachedFacets;
+        }
+    }
+
+    private RankingWeights getWeights() {
+        if (Instant.now().isBefore(weightsExpireAt)) {
+            return cachedWeights;
+        }
+
+        synchronized (weightsLock) {
+            if (Instant.now().isBefore(weightsExpireAt)) {
+                return cachedWeights;
+            }
+
+            cachedWeights = computeWeights();
+            weightsExpireAt = Instant.now().plus(CACHE_TTL);
+
+            return cachedWeights;
+        }
     }
 
     /**

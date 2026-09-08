@@ -15,8 +15,21 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # Le schéma appartient désormais aux migrations Flyway (dal/src/main/resources/db/
+      # migration) : Hibernate ne le modifie plus, il vérifie seulement que les entités
+      # correspondent à ce qu'il trouve. Un écart fait échouer le démarrage, au lieu de
+      # produire une colonne fantôme découverte trois semaines plus tard en production.
+      ddl-auto: validate
     show-sql: true
+
+  flyway:
+    # Les bases déjà en service — le poste de développement, et la pile docker dont le
+    # script d'init recrée le schéma d'origine — sont marquées à la V1 sans que celle-ci
+    # soit rejouée ; seules les migrations suivantes s'y appliquent. Une base vide, elle,
+    # reçoit toute la série depuis la V1.
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: "schema initial (avant Flyway)"
 
 igdb:
   client-id: ${IGDB_CLIENT_ID}

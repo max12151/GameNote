@@ -16,6 +16,7 @@ public class GameRatingDto {
     private List<String> publishers;
     private List<String> platforms;
     private Integer rating;
+    private GameStatusDto status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -105,6 +106,14 @@ public class GameRatingDto {
 
     public void setRating(Integer rating) {
         this.rating = rating;
+    }
+
+    public GameStatusDto getStatus() {
+        return status;
+    }
+
+    public void setStatus(GameStatusDto status) {
+        this.status = status;
     }
 
     public OffsetDateTime getCreatedAt() {

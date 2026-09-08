@@ -9,8 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class IgdbGameClient {
@@ -29,19 +31,17 @@ public class IgdbGameClient {
     // Plafond imposé par IGDB sur le paramètre "limit".
     private static final int MAX_IGDB_LIMIT = 500;
 
-    private static final String FIELDS = """
-            id,name,summary,game_type,first_release_date,cover.url,
-                   genres.name,platforms.name,rating,aggregated_rating,total_rating_count,
-                   involved_companies.company.name,involved_companies.developer,involved_companies.publisher,
-                   artworks.url,screenshots.url""";
-
-    // La page Découvrir n'affiche qu'une jaquette : demander en plus les artworks et les
-    // captures d'écran alourdirait fortement la réponse pour des centaines de jeux, sans
-    // rien apporter à l'écran.
+    // Champs demandés pour toutes les requêtes. La page Découvrir n'affiche qu'une
+    // jaquette : lui demander en plus les artworks et les captures d'écran alourdirait
+    // fortement la réponse pour des centaines de jeux, sans rien apporter à l'écran.
     private static final String DISCOVER_FIELDS = """
             id,name,summary,game_type,first_release_date,cover.url,
                    genres.name,platforms.name,rating,aggregated_rating,total_rating_count,
                    involved_companies.company.name,involved_companies.developer,involved_companies.publisher""";
+
+    // La recherche et la fiche détaillée ajoutent les visuels au même socle, plutôt que
+    // de recopier la liste : deux listes jumelles finissaient fatalement par diverger.
+    private static final String FIELDS = DISCOVER_FIELDS + ",artworks.url,screenshots.url";
 
     private final RestTemplate restTemplate;
     private final IgdbProperties properties;
@@ -57,17 +57,10 @@ public class IgdbGameClient {
         this.tokenService = tokenService;
     }
 
-    public List<IgdbGameResult> searchGames(
-            String search,
-            int limit
-    ) {
+    public List<IgdbGameResult> searchGames(String search, int limit) {
         if (search == null || search.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le terme de recherche est obligatoire"
-            );
+            throw new IllegalArgumentException("Le terme de recherche est obligatoire");
         }
-
-        int safeLimit = clampLimit(limit);
 
         // On récupère un lot plus large de résultats pertinents (triés par IGDB selon la
         // pertinence textuelle), puis on les retrie nous-mêmes par popularité avant de ne
@@ -88,7 +81,7 @@ public class IgdbGameClient {
 
         return execute(igdbQuery).stream()
                 .sorted(Comparator.comparingLong(this::popularity).reversed())
-                .limit(safeLimit)
+                .limit(clampLimit(limit))
                 .toList();
     }
 
@@ -123,7 +116,7 @@ public class IgdbGameClient {
                 .formatted(
                         DISCOVER_FIELDS,
                         where,
-                        Math.min(Math.max(poolSize, 1), MAX_IGDB_LIMIT)
+                        Math.clamp(poolSize, 1, MAX_IGDB_LIMIT)
                 );
 
         return execute(igdbQuery);
@@ -138,7 +131,7 @@ public class IgdbGameClient {
      * quoi la carte n'aurait rien à montrer.
      */
     public List<IgdbGameResult> fetchUpcoming(int limit) {
-        long now = java.time.Instant.now().getEpochSecond();
+        long now = Instant.now().getEpochSecond();
 
         String igdbQuery = """
             fields %s,hypes;
@@ -150,7 +143,7 @@ public class IgdbGameClient {
                         DISCOVER_FIELDS,
                         BASE_WHERE,
                         now,
-                        Math.min(Math.max(limit, 1), MAX_IGDB_LIMIT)
+                        Math.clamp(limit, 1, MAX_IGDB_LIMIT)
                 );
 
         return execute(igdbQuery);
@@ -161,7 +154,7 @@ public class IgdbGameClient {
      * un titre que personne n'a encore noté : la base du site n'en a alors aucune trace, et
      * IGDB reste la seule source de ses métadonnées.
      */
-    public java.util.Optional<IgdbGameResult> fetchById(Long igdbGameId) {
+    public Optional<IgdbGameResult> fetchById(Long igdbGameId) {
         String igdbQuery = """
             fields %s;
             where id = %d;
@@ -174,42 +167,25 @@ public class IgdbGameClient {
 
     private List<IgdbGameResult> execute(String igdbQuery) {
         HttpHeaders headers = new HttpHeaders();
-
-        headers.set(
-                "Client-ID",
-                properties.getClientId()
-        );
-
-        headers.set(
-                HttpHeaders.AUTHORIZATION,
-                "Bearer " + tokenService.getAccessToken()
-        );
-
+        headers.set("Client-ID", properties.getClientId());
+        headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + tokenService.getAccessToken());
         headers.setContentType(MediaType.TEXT_PLAIN);
 
-        HttpEntity<String> request =
-                new HttpEntity<>(igdbQuery, headers);
+        ResponseEntity<List<IgdbGameResult>> response = restTemplate.exchange(
+                properties.getApiUrl() + "/games",
+                HttpMethod.POST,
+                new HttpEntity<>(igdbQuery, headers),
+                new ParameterizedTypeReference<>() {
+                }
+        );
 
-        String gamesUrl = properties.getApiUrl() + "/games";
-
-        ResponseEntity<List<IgdbGameResult>> response =
-                restTemplate.exchange(
-                        gamesUrl,
-                        HttpMethod.POST,
-                        request,
-                        new ParameterizedTypeReference<>() {
-                        }
-                );
-
-        if (response.getBody() == null) {
-            return List.of();
-        }
-
-        return response.getBody();
+        // Un corps vide n'est pas une erreur : IGDB répond 200 avec un tableau absent
+        // quand aucun jeu ne satisfait la requête.
+        return response.getBody() != null ? response.getBody() : List.of();
     }
 
-    private int clampLimit(int limit) {
-        return Math.min(Math.max(limit, 1), 50);
+    private static int clampLimit(int limit) {
+        return Math.clamp(limit, 1, SEARCH_POOL_SIZE);
     }
 
     private String escapeSearch(String value) {

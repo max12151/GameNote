@@ -27,10 +27,24 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!--
+            Migrations de schéma. Elles vivent dans ce module, avec les entités qu'elles
+            décrivent : db/migration est lu depuis le classpath, que l'application soit
+            lancée depuis l'IDE ou depuis le jar.
+
+            Le starter, et non `flyway-core` seul : Spring Boot 4 a sorti les
+            auto-configurations dans des modules à part, et la seule présence de Flyway sur
+            le classpath ne déclenche plus rien. Vérifié à la dure — les migrations ne
+            s'exécutaient pas, et Hibernate refusait de démarrer sur une colonne manquante.
+        -->
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

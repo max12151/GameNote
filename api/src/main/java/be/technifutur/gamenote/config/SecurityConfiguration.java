@@ -8,10 +8,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -44,11 +44,20 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/igdb/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Documentation OpenAPI. Sans ces trois motifs, /swagger-ui.html
+                        // tombait sous `anyRequest().authenticated()` et répondait 401 :
+                        // la dépendance springdoc était embarquée sans jamais servir, et
+                        // le README promettait une page inaccessible. Le profil `prod`
+                        // coupe springdoc à la racine (springdoc.*.enabled: false), ce
+                        // qui rend ces autorisations sans objet en production.
+                        .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
                         // Quand un contrôleur lève une exception, Spring redirige en interne
                         // vers /error. Sans cette ligne, ce renvoi est lui-même refusé pour un
                         // visiteur anonyme : l'erreur sort alors en 403 au corps vide, quelle
@@ -60,11 +69,26 @@ public class SecurityConfiguration {
                         // pas encore inscrit. La fiche détaillée, elle, reste protégée : elle
                         // expose la note et le commentaire de l'utilisateur courant.
                         .requestMatchers(HttpMethod.GET, "/api/community/games").permitAll()
+                        // Les valeurs des filtres accompagnent ce classement : les réserver aux
+                        // membres laisserait un visiteur devant une barre de filtres vide, à
+                        // côté d'un classement qu'il a le droit de lire.
+                        .requestMatchers(HttpMethod.GET, "/api/community/filters").permitAll()
                         // Une balise <img> ne peut pas porter le jeton JWT ; cf. AvatarController.
                         .requestMatchers(HttpMethod.GET, "/api/users/*/avatar").permitAll()
+                        // La console d'administration. Le rôle vient des autorisations posées
+                        // par JwtAuthenticationFilter, qui les relit en base à chaque requête :
+                        // un administrateur rétrogradé perd donc l'accès immédiatement, sans
+                        // attendre l'expiration de son jeton.
+                        //
+                        // Le contrôle est déclaré ici plutôt que dans chaque contrôleur : une
+                        // route d'administration ajoutée demain sera couverte sans que
+                        // personne ait à y penser.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(handling -> handling.authenticationEntryPoint(unauthenticatedEntryPoint()))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(unauthenticatedEntryPoint())
+                        .accessDeniedHandler(accessDeniedHandler()))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -85,6 +109,13 @@ public class SecurityConfiguration {
      */
     @Bean
     public AuthenticationEntryPoint unauthenticatedEntryPoint() {
+        /*
+         * Instance créée à la main, et non injectée depuis le contexte : Spring Boot 4
+         * n'enregistre plus de bean `com.fasterxml.jackson.databind.ObjectMapper`.
+         * Demander ce type en paramètre empêche l'application de démarrer — vérifié.
+         * La sérialisation dont il s'agit ici est celle d'un record à un seul champ, sur
+         * laquelle aucun réglage global n'aurait d'effet visible.
+         */
         ObjectMapper mapper = new ObjectMapper();
 
         return (request, response, exception) -> {
@@ -92,6 +123,26 @@ public class SecurityConfiguration {
             response.setContentType("application/json;charset=UTF-8");
             mapper.writeValue(response.getWriter(),
                     new ErrorResponse("Session expirée ou identifiants manquants"));
+        };
+    }
+
+    /**
+     * Réponse à une requête authentifiée mais interdite : 403, avec un corps.
+     * <p>
+     * Sans ce gestionnaire, un membre ordinaire qui tape une adresse de la console
+     * d'administration reçoit un 403 au corps vide, que le front ne peut pas distinguer d'une
+     * panne. Le message reprend la forme des autres erreurs de l'API, et ne dit rien de ce
+     * qui se trouve derrière : seulement que ce n'est pas pour lui.
+     */
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        ObjectMapper mapper = new ObjectMapper();
+
+        return (request, response, exception) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            mapper.writeValue(response.getWriter(),
+                    new ErrorResponse("Vous n'avez pas les droits nécessaires pour cette action"));
         };
     }
 
@@ -106,11 +157,5 @@ public class SecurityConfiguration {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        // BCrypt avec coût par défaut (10), largement suffisant pour un projet de démo
-        return new BCryptPasswordEncoder();
     }
 }

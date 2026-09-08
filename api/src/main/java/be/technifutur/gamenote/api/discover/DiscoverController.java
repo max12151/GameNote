@@ -62,7 +62,7 @@ public class DiscoverController {
         return ResponseEntity.noContent().build();
     }
 
-    private int clampLimit(int limit) {
-        return Math.min(Math.max(limit, 1), MAX_LIMIT);
+    private static int clampLimit(int limit) {
+        return Math.clamp(limit, 1, MAX_LIMIT);
     }
 }

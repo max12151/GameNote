@@ -35,6 +35,28 @@ public class UserEntity {
     @Column(length = 20)
     private UserRole role = UserRole.USER;
 
+    /**
+     * Date de suspension par un administrateur, nulle tant que le compte est actif. Un compte
+     * suspendu ne peut plus se connecter ni rien publier ; ce qu'il a déjà écrit reste en
+     * place, la suspension n'est pas une suppression.
+     */
+    @Column(name = "suspended_at")
+    private OffsetDateTime suspendedAt;
+
+    @Column(name = "suspension_reason", length = 255)
+    private String suspensionReason;
+
+    /**
+     * Date d'anonymisation, nulle pour un compte ordinaire.
+     * <p>
+     * Supprimer son compte ne supprime pas la ligne : le pseudo devient « Compte supprimé »,
+     * l'e-mail et l'empreinte du mot de passe sont rendus inutilisables, l'avatar et la
+     * biographie sont effacés. Les notes et les avis restent, faute de quoi le classement du
+     * site perdrait ses données et les fils de discussion se retrouveraient troués.
+     */
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -106,6 +128,43 @@ public class UserEntity {
 
     public boolean isAdmin() {
         return getRole() == UserRole.ADMIN;
+    }
+
+    public OffsetDateTime getSuspendedAt() {
+        return suspendedAt;
+    }
+
+    public void setSuspendedAt(OffsetDateTime suspendedAt) {
+        this.suspendedAt = suspendedAt;
+    }
+
+    public String getSuspensionReason() {
+        return suspensionReason;
+    }
+
+    public void setSuspensionReason(String suspensionReason) {
+        this.suspensionReason = suspensionReason;
+    }
+
+    public OffsetDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(OffsetDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public boolean isSuspended() {
+        return suspendedAt != null;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    /** Un compte suspendu ou anonymisé n'ouvre plus de session et ne publie plus rien. */
+    public boolean isActive() {
+        return !isSuspended() && !isDeleted();
     }
 
     public OffsetDateTime getCreatedAt() {

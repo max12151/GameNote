@@ -3,10 +3,14 @@ package be.technifutur.il.rating;
 import be.technifutur.bll.comment.GameCommentService;
 import be.technifutur.bll.rating.GameRatingService;
 import be.technifutur.bll.user.UserService;
+import be.technifutur.dal.rating.GameStatus;
 import be.technifutur.dal.user.UserEntity;
 import be.technifutur.dl.rating.GameRatingDto;
+import be.technifutur.dl.rating.GameStatusDto;
+import be.technifutur.dl.rating.LibrarySummaryDto;
 import be.technifutur.dl.rating.RateGameRequestDto;
 import be.technifutur.dl.rating.RatingStatsDto;
+import be.technifutur.dl.rating.SetStatusRequestDto;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,30 +35,53 @@ public class RatingFacade {
 
     public GameRatingDto rateGame(String username, RateGameRequestDto request) {
         UserEntity user = userService.getByUsername(username);
+
         return gameRatingMapper.toDto(gameRatingService.rateGame(
                 user.getId(),
-                request.getIgdbGameId(),
-                request.getTitle(),
-                request.getCoverUrl(),
-                request.getReleaseDate(),
-                request.getGenres(),
-                request.getSummary(),
-                request.getDevelopers(),
-                request.getPublishers(),
-                request.getPlatforms(),
-                request.getRating()
+                gameRatingMapper.toMetadata(request),
+                request.getRating(),
+                gameRatingMapper.toStatus(request.getStatus())
         ));
     }
 
-    public List<GameRatingDto> getCollection(String username) {
+    /**
+     * Range un jeu dans la bibliothèque sans le noter, ou déplace celui qui s'y trouve déjà.
+     * <p>
+     * C'est le geste « ajouter à ma liste d'envies » depuis la recherche, et celui du
+     * sélecteur de statut sur la fiche d'un jeu.
+     */
+    public GameRatingDto setStatus(String username, SetStatusRequestDto request) {
         UserEntity user = userService.getByUsername(username);
-        return gameRatingService.getRatingsForUser(user.getId()).stream()
+
+        return gameRatingMapper.toDto(gameRatingService.setStatus(
+                user.getId(),
+                gameRatingMapper.toMetadata(request),
+                gameRatingMapper.toStatus(request.getStatus())
+        ));
+    }
+
+    /**
+     * La bibliothèque, entière ou restreinte à un statut.
+     *
+     * @param status onglet demandé, ou {@code null} pour tout voir
+     */
+    public List<GameRatingDto> getCollection(String username, GameStatusDto status) {
+        UserEntity user = userService.getByUsername(username);
+        GameStatus filter = gameRatingMapper.toStatus(status);
+
+        return gameRatingService.getLibrary(user.getId(), filter).stream()
                 .map(gameRatingMapper::toDto)
                 .toList();
     }
 
+    public LibrarySummaryDto getLibrarySummary(String username) {
+        UserEntity user = userService.getByUsername(username);
+
+        return gameRatingMapper.toLibrarySummaryDto(gameRatingService.getLibrarySummary(user.getId()));
+    }
+
     /**
-     * Retirer un jeu de sa collection retire aussi l'avis qu'on avait laissé dessus : le
+     * Retirer un jeu de sa bibliothèque retire aussi l'avis qu'on avait laissé dessus : le
      * commentaire n'a de sens qu'accompagné de la note qui le justifie. Les deux suppressions
      * partagent une transaction pour ne jamais laisser un commentaire orphelin.
      */

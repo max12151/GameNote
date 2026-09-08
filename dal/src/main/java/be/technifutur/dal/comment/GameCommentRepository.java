@@ -20,11 +20,15 @@ public interface GameCommentRepository extends JpaRepository<GameCommentEntity, 
     int deleteByUserIdAndIgdbGameId(@Param("userId") Long userId,
                                     @Param("igdbGameId") Long igdbGameId);
 
-    // Le pseudo de l'auteur et sa note sont joints ici plutôt que rechargés commentaire par
-    // commentaire côté service. L'avatar, lui, n'est représenté que par un booléen : l'image
-    // est une data URI base64 pouvant peser plusieurs mégaoctets, la transporter pour chaque
-    // commentaire ferait exploser la réponse. Le front la demande à la route dédiée, qui la
-    // sert avec un ETag et laisse donc le navigateur la mettre en cache.
+    // Le pseudo de l'auteur, sa note et le nombre de « utile » sont joints ici plutôt que
+    // rechargés commentaire par commentaire côté service. L'avatar, lui, n'est représenté que
+    // par un booléen : l'image est une data URI base64 pouvant peser plusieurs mégaoctets, la
+    // transporter pour chaque commentaire ferait exploser la réponse. Le front la demande à
+    // la route dédiée, qui la sert avec un ETag et laisse donc le navigateur la cacher.
+    //
+    // Le tri arrive en paramètre : « les plus utiles » remonte les avis que la communauté a
+    // distingués, « les plus récents » — le défaut — garde le fil chronologique. Un compteur
+    // à zéro pour tout le monde quand le tri est chronologique, et c'est la date qui tranche.
     @Query("""
             select c.id as id,
                    c.igdbGameId as igdbGameId,
@@ -34,19 +38,34 @@ public interface GameCommentRepository extends JpaRepository<GameCommentEntity, 
                    u.id as authorId,
                    u.username as authorUsername,
                    case when u.avatarUrl is null or length(u.avatarUrl) = 0 then false else true end as authorHasAvatar,
-                   r.rating as authorRating
+                   case when u.deletedAt is null then false else true end as authorDeleted,
+                   r.rating as authorRating,
+                   (select count(re) from CommentReactionEntity re where re.commentId = c.id) as usefulCount
             from GameCommentEntity c
                 join UserEntity u on u.id = c.userId
                 left join GameRatingEntity r on r.userId = c.userId and r.igdbGameId = c.igdbGameId
-            where c.igdbGameId = :igdbGameId
-            order by c.createdAt desc
+            where c.igdbGameId = :igdbGameId and u.suspendedAt is null
+            order by
+                case when :sort = 'USEFUL'
+                     then (select count(re) from CommentReactionEntity re where re.commentId = c.id)
+                     else 0L end desc,
+                c.createdAt desc
             """)
-    List<GameCommentView> findViewsByIgdbGameId(@Param("igdbGameId") Long igdbGameId);
+    List<GameCommentView> findViewsByIgdbGameId(@Param("igdbGameId") Long igdbGameId,
+                                                @Param("sort") String sort);
 
+    /**
+     * Nombre d'avis par jeu, tel qu'il s'affiche sur le classement.
+     * <p>
+     * La jointure sur l'auteur n'est pas décorative : le fil d'un jeu masque les avis des
+     * comptes suspendus, et un compteur qui les inclurait annoncerait douze avis pour une
+     * page qui n'en montre que onze.
+     */
     @Query("""
             select c.igdbGameId as igdbGameId, count(c) as commentCount
             from GameCommentEntity c
-            where c.igdbGameId in :igdbGameIds
+                join UserEntity u on u.id = c.userId
+            where c.igdbGameId in :igdbGameIds and u.suspendedAt is null
             group by c.igdbGameId
             """)
     List<GameCommentCountView> countByIgdbGameIds(@Param("igdbGameIds") Collection<Long> igdbGameIds);
@@ -56,7 +75,7 @@ public interface GameCommentRepository extends JpaRepository<GameCommentEntity, 
      * <p>
      * Une seule requête pour les deux usages : la clause est neutralisée quand le paramètre
      * est nul, comme le filtre de titre du classement l'est sur une recherche vide. Écrire
-     * deux fois la même projection de onze colonnes pour une seule ligne d'écart aurait
+     * deux fois la même projection de douze colonnes pour une seule ligne d'écart aurait
      * surtout garanti qu'elles finissent par diverger.
      * <p>
      * La pagination porte le « combien » : l'accueil en veut une poignée, un profil un peu
@@ -71,14 +90,52 @@ public interface GameCommentRepository extends JpaRepository<GameCommentEntity, 
                    u.id as authorId,
                    u.username as authorUsername,
                    case when u.avatarUrl is null or length(u.avatarUrl) = 0 then false else true end as authorHasAvatar,
+                   case when u.deletedAt is null then false else true end as authorDeleted,
                    r.rating as authorRating,
+                   (select count(re) from CommentReactionEntity re where re.commentId = c.id) as usefulCount,
                    r.title as gameTitle,
                    r.coverUrl as gameCoverUrl
             from GameCommentEntity c
                 join UserEntity u on u.id = c.userId
                 join GameRatingEntity r on r.userId = c.userId and r.igdbGameId = c.igdbGameId
-            where :authorId is null or c.userId = :authorId
+            where (:authorId is null or c.userId = :authorId) and u.suspendedAt is null
             order by c.createdAt desc
             """)
     List<RecentGameCommentView> findRecentViews(@Param("authorId") Long authorId, Pageable pageable);
+
+    /**
+     * Les derniers avis des joueurs suivis, pour le fil d'activité.
+     * <p>
+     * Même projection que {@link #findRecentViews}, mais sur un ensemble d'auteurs plutôt que
+     * sur un seul : passer une collection au paramètre unique aurait demandé une clause
+     * {@code in} là où l'autre veut une égalité, et mélanger les deux dans une requête déjà
+     * neutralisable par null aurait rendu la clause illisible.
+     */
+    @Query("""
+            select c.id as id,
+                   c.igdbGameId as igdbGameId,
+                   c.content as content,
+                   c.createdAt as createdAt,
+                   c.updatedAt as updatedAt,
+                   u.id as authorId,
+                   u.username as authorUsername,
+                   case when u.avatarUrl is null or length(u.avatarUrl) = 0 then false else true end as authorHasAvatar,
+                   case when u.deletedAt is null then false else true end as authorDeleted,
+                   r.rating as authorRating,
+                   (select count(re) from CommentReactionEntity re where re.commentId = c.id) as usefulCount,
+                   r.title as gameTitle,
+                   r.coverUrl as gameCoverUrl
+            from GameCommentEntity c
+                join UserEntity u on u.id = c.userId
+                join GameRatingEntity r on r.userId = c.userId and r.igdbGameId = c.igdbGameId
+            where c.userId in :authorIds and u.deletedAt is null and u.suspendedAt is null
+            order by c.createdAt desc
+            """)
+    List<RecentGameCommentView> findFeedViews(@Param("authorIds") Collection<Long> authorIds, Pageable pageable);
+
+    /**
+     * Combien d'avis un joueur a publiés. Sert au front à savoir s'il reste des pages à
+     * charger sur un profil, sans lui faire deviner à partir de ce qu'il a déjà reçu.
+     */
+    long countByUserId(Long userId);
 }

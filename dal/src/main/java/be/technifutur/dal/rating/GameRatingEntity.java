@@ -60,8 +60,22 @@ public class GameRatingEntity {
     @Fetch(FetchMode.SUBSELECT)
     private List<String> platforms;
 
-    @Column(nullable = false)
+    /**
+     * Note sur 10, ou {@code null} quand le jeu n'est que rangé dans la bibliothèque : une
+     * envie pas encore assouvie, ou un titre en cours sur lequel on n'a pas d'avis arrêté.
+     * <p>
+     * Toutes les agrégations du classement doivent donc écarter explicitement les lignes
+     * sans note — sinon un jeu mis en attente par dix joueurs compterait dix votes.
+     */
     private Integer rating;
+
+    /**
+     * État du jeu dans la bibliothèque. Jamais nul : une ligne existe parce que le joueur a
+     * placé ce jeu quelque part, même sans le noter.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private GameStatus status = GameStatus.FINISHED;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -168,6 +182,19 @@ public class GameRatingEntity {
 
     public void setRating(Integer rating) {
         this.rating = rating;
+    }
+
+    public GameStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(GameStatus status) {
+        this.status = status;
+    }
+
+    /** Une entrée compte dans les moyennes et le classement seulement si elle porte une note. */
+    public boolean isRated() {
+        return rating != null;
     }
 
     public OffsetDateTime getCreatedAt() {

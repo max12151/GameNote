@@ -37,7 +37,7 @@ public class UpcomingGamePool {
 
     public List<IgdbGameResult> getMostAnticipated(int limit) {
         List<IgdbGameResult> pool = getPool();
-        int safeLimit = Math.min(Math.max(limit, 1), POOL_SIZE);
+        int safeLimit = Math.clamp(limit, 1, POOL_SIZE);
 
         return pool.size() <= safeLimit ? pool : List.copyOf(pool.subList(0, safeLimit));
     }

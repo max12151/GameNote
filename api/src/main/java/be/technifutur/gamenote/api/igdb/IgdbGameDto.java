@@ -2,6 +2,7 @@ package be.technifutur.gamenote.api.igdb;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 public record IgdbGameDto(
         Long igdbId,
@@ -47,18 +48,15 @@ public record IgdbGameDto(
                 .toList();
     }
 
-    private static <T> List<String> mapNames(List<T> items, java.util.function.Function<T, String> nameFn) {
+    /** Extrait un champ texte d'une liste IGDB, en écartant les valeurs absentes. */
+    private static <T> List<String> mapNames(List<T> items, Function<T, String> nameFn) {
         if (items == null) return List.of();
         return items.stream().map(nameFn).filter(Objects::nonNull).toList();
     }
 
-    private static <T> List<String> mapUrls(List<T> items, java.util.function.Function<T, String> urlFn) {
-        if (items == null) return List.of();
-        return items.stream()
-                .map(urlFn)
-                .map(IgdbGameDto::normalizeUrl)
-                .filter(Objects::nonNull)
-                .toList();
+    /** Idem, pour les champs qui sont des adresses : IGDB les renvoie sans protocole. */
+    private static <T> List<String> mapUrls(List<T> items, Function<T, String> urlFn) {
+        return mapNames(items, urlFn.andThen(IgdbGameDto::normalizeUrl));
     }
 
     private static String normalizeUrl(String url) {

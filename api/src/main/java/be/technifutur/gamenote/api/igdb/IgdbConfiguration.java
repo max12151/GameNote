@@ -1,6 +1,5 @@
 package be.technifutur.gamenote.api.igdb;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -8,8 +7,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 
+// IgdbProperties n'est pas declare ici : le @ConfigurationPropertiesScan porte par
+// GameNoteApplication balaie deja tout be.technifutur et l'enregistre.
 @Configuration
-@EnableConfigurationProperties(IgdbProperties.class)
 public class IgdbConfiguration {
 
     /**

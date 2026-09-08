@@ -2,6 +2,8 @@ package be.technifutur.il.community;
 
 import be.technifutur.bll.community.CommunityGameDetail;
 import be.technifutur.bll.community.CommunityRanking;
+import be.technifutur.bll.community.RankingFacets;
+import be.technifutur.bll.community.RankingQuery;
 import be.technifutur.dal.rating.CommunityRankingView;
 import be.technifutur.dal.rating.GameRatingEntity;
 import be.technifutur.dal.rating.RatingBucketView;
@@ -10,7 +12,10 @@ import be.technifutur.dl.community.CommunityGameDetailDto;
 import be.technifutur.dl.community.CommunityGameDto;
 import be.technifutur.dl.community.CommunityGameInfoDto;
 import be.technifutur.dl.community.CommunityRankingDto;
+import be.technifutur.dl.community.RankingFacetsDto;
+import be.technifutur.dl.community.RankingFiltersDto;
 import be.technifutur.dl.community.RatingBucketDto;
+import be.technifutur.dl.rating.GameStatusDto;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -29,14 +34,38 @@ public class CommunityMapper {
                 ranking.page(),
                 ranking.size(),
                 ranking.weights().globalAverage(),
-                ranking.weights().minimumVotes()
+                ranking.weights().minimumVotes(),
+                toFiltersDto(ranking.query())
         );
+    }
+
+    /**
+     * Les filtres tels que le serveur les a compris. Renvoyer la demande normalisée plutôt
+     * que rien permet au front de refléter l'état réel du classement — une année aberrante ou
+     * un intervalle à l'envers ont pu être corrigés en chemin.
+     */
+    public RankingFiltersDto toFiltersDto(RankingQuery query) {
+        return new RankingFiltersDto(
+                query.search(),
+                query.genre(),
+                query.platform(),
+                query.yearFrom(),
+                query.yearTo(),
+                query.sort().name()
+        );
+    }
+
+    public RankingFacetsDto toFacetsDto(RankingFacets facets) {
+        return new RankingFacetsDto(facets.genres(), facets.platforms());
     }
 
     public CommunityGameDetailDto toDetailDto(CommunityGameDetail detail,
                                               List<GameCommentDto> comments,
                                               Integer myRating,
-                                              GameCommentDto myComment) {
+                                              GameCommentDto myComment,
+                                              GameStatusDto myStatus,
+                                              List<Long> myListIds,
+                                              String commentSort) {
         return new CommunityGameDetailDto(
                 toInfoDto(detail.game()),
                 detail.averageRating(),
@@ -44,7 +73,10 @@ public class CommunityMapper {
                 detail.distribution().stream().map(this::toBucketDto).toList(),
                 comments,
                 myRating,
-                myComment
+                myComment,
+                myStatus,
+                myListIds,
+                commentSort
         );
     }
 

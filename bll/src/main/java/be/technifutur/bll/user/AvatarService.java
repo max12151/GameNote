@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,7 @@ public class AvatarService {
         }
 
         String contentType = metadata.substring(0, metadata.length() - BASE64_MARKER.length())
-                .toLowerCase(java.util.Locale.ROOT);
+                .toLowerCase(Locale.ROOT);
 
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
             return Optional.empty();

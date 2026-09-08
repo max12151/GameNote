@@ -24,11 +24,10 @@ COPY il/src il/src
 # Le dépôt Maven est monté en cache : les dépendances survivent d'une construction à
 # l'autre au lieu d'être retéléchargées à chaque modification du code.
 #
-# `-Dmaven.test.skip=true` et non `-DskipTests` : la dépendance spring-boot-starter-test
-# n'étant déclarée nulle part, `api/src/test` ne compile pas, et -DskipTests le compile
-# quand même. À remplacer par une vraie exécution des tests le jour où ils existeront.
+# Les tests tournent : ce sont des tests unitaires purs, sans base ni réseau. Une
+# construction d'image qui les ignorerait ne vérifierait plus rien avant le déploiement.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -Dmaven.test.skip=true package
+    mvn -B package
 
 # ---------------------------------------------------------------------------------
 # Étape 2 : exécution

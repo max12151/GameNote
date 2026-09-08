@@ -2,19 +2,27 @@ package be.technifutur.il.comment;
 
 import be.technifutur.dal.comment.GameCommentEntity;
 import be.technifutur.dal.comment.GameCommentView;
+import be.technifutur.dal.comment.RecentGameCommentView;
 import be.technifutur.dl.comment.GameCommentDto;
 import be.technifutur.dl.comment.RecentCommentDto;
-import be.technifutur.dal.comment.RecentGameCommentView;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GameCommentMapper {
 
     /**
-     * Commentaire lu dans le fil d'un jeu. Les drapeaux {@code mine} / {@code canDelete} sont
-     * calculés ici, une fois, plutôt que rejoués côté front pour chaque commentaire affiché.
+     * Commentaire lu dans le fil d'un jeu. Les drapeaux {@code mine} / {@code canDelete} /
+     * {@code canReact} sont calculés ici, une fois, plutôt que rejoués côté front pour chaque
+     * commentaire affiché.
+     *
+     * @param reactedCommentIds avis que l'utilisateur courant a déjà marqués comme utiles,
+     *                          ramenés en une requête pour tout le fil
      */
-    public GameCommentDto toDto(GameCommentView view, Long currentUserId, boolean currentUserIsAdmin) {
+    public GameCommentDto toDto(GameCommentView view,
+                                Long currentUserId,
+                                boolean currentUserIsAdmin,
+                                Set<Long> reactedCommentIds) {
         boolean mine = view.getAuthorId().equals(currentUserId);
 
         return new GameCommentDto(
@@ -26,17 +34,25 @@ public class GameCommentMapper {
                 view.getAuthorId(),
                 view.getAuthorUsername(),
                 view.getAuthorHasAvatar(),
+                view.getAuthorDeleted(),
                 view.getAuthorRating(),
                 mine,
-                mine || currentUserIsAdmin
+                mine || currentUserIsAdmin,
+                view.getUsefulCount(),
+                reactedCommentIds.contains(view.getId()),
+                !mine
         );
     }
 
-    /** Commentaire que l'utilisateur courant vient d'écrire : il en est forcément l'auteur. */
+    /**
+     * Commentaire que l'utilisateur courant vient d'écrire : il en est forcément l'auteur, ne
+     * peut donc pas le marquer utile, et personne n'a encore eu le temps de le faire.
+     */
     public GameCommentDto toOwnDto(GameCommentEntity entity,
                                    String authorUsername,
                                    boolean authorHasAvatar,
-                                   Integer authorRating) {
+                                   Integer authorRating,
+                                   long usefulCount) {
         return new GameCommentDto(
                 entity.getId(),
                 entity.getIgdbGameId(),
@@ -46,9 +62,13 @@ public class GameCommentMapper {
                 entity.getUserId(),
                 authorUsername,
                 authorHasAvatar,
+                false,
                 authorRating,
                 true,
-                true
+                true,
+                usefulCount,
+                false,
+                false
         );
     }
 
@@ -68,7 +88,9 @@ public class GameCommentMapper {
                 view.getAuthorId(),
                 view.getAuthorUsername(),
                 view.getAuthorHasAvatar(),
-                view.getAuthorRating()
+                view.getAuthorDeleted(),
+                view.getAuthorRating(),
+                view.getUsefulCount()
         );
     }
 }

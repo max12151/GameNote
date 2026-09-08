@@ -1,11 +1,16 @@
 package be.technifutur.il.user;
 
 
+import be.technifutur.bll.rating.LibrarySummary;
 import be.technifutur.bll.rating.RatingStats;
 import be.technifutur.dal.user.UserEntity;
 import be.technifutur.dl.comment.RecentCommentDto;
+import be.technifutur.dal.user.UserSearchView;
+import be.technifutur.dl.list.GameListDto;
+import be.technifutur.dl.user.FollowStatsDto;
 import be.technifutur.dl.user.PublicProfileDto;
 import be.technifutur.dl.user.UserDto;
+import be.technifutur.dl.user.UserSearchResultDto;
 import be.technifutur.il.rating.GameRatingMapper;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -48,7 +53,11 @@ public class UserMapper {
      */
     public PublicProfileDto toPublicDto(UserEntity entity,
                                         RatingStats stats,
-                                        List<RecentCommentDto> recentComments) {
+                                        List<RecentCommentDto> recentComments,
+                                        long totalComments,
+                                        FollowStatsDto follow,
+                                        LibrarySummary library,
+                                        List<GameListDto> publicLists) {
         return new PublicProfileDto(
                 entity.getId(),
                 entity.getUsername(),
@@ -62,7 +71,26 @@ public class UserMapper {
                 stats.topGenreCount(),
                 gameRatingMapper.toDto(stats.bestRatedGame()),
                 stats.genreBreakdown().stream().map(gameRatingMapper::toGenreCountDto).toList(),
-                recentComments
+                recentComments,
+                totalComments,
+                follow,
+                gameRatingMapper.toLibrarySummaryDto(library),
+                publicLists
+        );
+    }
+
+    /**
+     * Ligne de résultat d'une recherche de membre. Le nombre de jeux notés est passé à
+     * part : il vient d'une requête d'agrégat faite une fois pour toute la liste, et non
+     * de la projection qui a servi à trouver les pseudos.
+     */
+    public UserSearchResultDto toSearchDto(UserSearchView view, long ratedGames, boolean followedByMe) {
+        return new UserSearchResultDto(
+                view.getId(),
+                view.getUsername(),
+                view.getHasAvatar(),
+                ratedGames,
+                followedByMe
         );
     }
 }
